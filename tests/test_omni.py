@@ -31,6 +31,27 @@ class TestCurve:
         np.testing.assert_allclose(from_curve, from_predict)
 
 
+class TestCurveInverse:
+    def test_known_params(self):
+        params = {"cp": 250, "p_max": 1100, "w_prime": 20_000, "a": 40, "tcp_max": 1800}
+        tte = OmniDurationRegressor.curve_inverse(np.array([280, 350, 500]), **params)
+        assert tte.shape == (3,)
+        assert np.all(np.diff(tte) <= 0)
+
+    def test_scalar_input(self):
+        tte = OmniDurationRegressor.curve_inverse(
+            350, cp=250, p_max=1100, w_prime=20_000, a=40, tcp_max=1800,
+        )
+        assert isinstance(tte, float)
+
+    def test_roundtrip_with_curve(self):
+        params = {"cp": 250, "p_max": 1100, "w_prime": 20_000, "a": 40, "tcp_max": 1800}
+        t_in = np.array([10, 300, 3600])
+        power = OmniDurationRegressor.curve(t_in, **params)
+        t_out = OmniDurationRegressor.curve_inverse(power, **params)
+        np.testing.assert_allclose(t_out, t_in, rtol=1e-6)
+
+
 class TestOmniDurationRegressor:
     def test_fit_predict_roundtrip(self, omni_data):
         X, y = omni_data
@@ -61,9 +82,18 @@ class TestOmniDurationRegressor:
     def test_predict_inverse(self, omni_data):
         X, y = omni_data
         reg = OmniDurationRegressor().fit(X, y)
-        power, tte = reg.predict_inverse()
-        assert len(power) == len(tte)
+        power = np.array([280, 350, 500])
+        tte = reg.predict_inverse(power)
+        assert tte.shape == (3,)
         assert np.all(np.diff(tte) <= 0)
+
+    def test_predict_inverse_roundtrip(self, omni_data):
+        X, y = omni_data
+        reg = OmniDurationRegressor().fit(X, y)
+        power_in = np.array([280, 350, 500])
+        tte = reg.predict_inverse(power_in)
+        power_out = reg.predict(tte.reshape(-1, 1))
+        np.testing.assert_allclose(power_out, power_in, rtol=1e-6)
 
     def test_opt_result_stored(self, omni_data):
         X, y = omni_data

@@ -65,10 +65,14 @@ reg = OmniDurationRegressor(
 
 ## Time to exhaustion
 
+The inverse of the power-duration curve: given a power, how long can it be sustained?
+
 ```python
-power, tte = reg.predict_inverse()
-# power: array of watt values
-# tte: corresponding time to exhaustion in seconds
+# On a fitted model
+tte = reg.predict_inverse(np.array([250, 300, 350]))
+
+# With known parameters
+tte = TwoParameterRegressor.curve_inverse(350, cp=250, w_prime=20_000)
 ```
 
 ## References

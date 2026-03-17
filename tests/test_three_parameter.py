@@ -26,6 +26,27 @@ class TestCurve:
         np.testing.assert_allclose(from_curve, from_predict)
 
 
+class TestCurveInverse:
+    def test_known_params(self):
+        params = {"cp": 250, "w_prime": 20_000, "p_max": 1100}
+        tte = ThreeParameterRegressor.curve_inverse(np.array([300, 400, 500]), **params)
+        assert tte.shape == (3,)
+        assert np.all(np.diff(tte) <= 0)
+
+    def test_scalar_input(self):
+        tte = ThreeParameterRegressor.curve_inverse(
+            400, cp=250, w_prime=20_000, p_max=1100,
+        )
+        assert isinstance(tte, float)
+
+    def test_roundtrip_with_curve(self):
+        params = {"cp": 250, "w_prime": 20_000, "p_max": 1100}
+        t_in = np.array([5, 60, 600])
+        power = ThreeParameterRegressor.curve(t_in, **params)
+        t_out = ThreeParameterRegressor.curve_inverse(power, **params)
+        np.testing.assert_allclose(t_out, t_in, rtol=1e-6)
+
+
 class TestThreeParameterRegressor:
     def test_fit_predict_roundtrip(self, three_param_data):
         X, y = three_param_data
@@ -62,9 +83,18 @@ class TestThreeParameterRegressor:
     def test_predict_inverse(self, three_param_data):
         X, y = three_param_data
         reg = ThreeParameterRegressor().fit(X, y)
-        power, tte = reg.predict_inverse()
-        assert len(power) == len(tte)
+        power = np.array([300, 400, 500])
+        tte = reg.predict_inverse(power)
+        assert tte.shape == (3,)
         assert np.all(np.diff(tte) <= 0)
+
+    def test_predict_inverse_roundtrip(self, three_param_data):
+        X, y = three_param_data
+        reg = ThreeParameterRegressor().fit(X, y)
+        power_in = np.array([300, 400, 500])
+        tte = reg.predict_inverse(power_in)
+        power_out = reg.predict(tte.reshape(-1, 1))
+        np.testing.assert_allclose(power_out, power_in, rtol=1e-6)
 
     def test_get_set_params(self):
         reg = ThreeParameterRegressor(method="L-BFGS-B", max_iter=5000)

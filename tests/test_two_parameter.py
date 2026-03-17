@@ -23,6 +23,26 @@ class TestCurve:
         np.testing.assert_allclose(from_curve, from_predict)
 
 
+class TestCurveInverse:
+    def test_known_params(self):
+        tte = TwoParameterRegressor.curve_inverse(
+            np.array([300, 350, 400]), cp=250, w_prime=20_000,
+        )
+        expected = 20_000 / (np.array([300, 350, 400]) - 250)
+        np.testing.assert_allclose(tte, expected, rtol=1e-6)
+
+    def test_scalar_input(self):
+        tte = TwoParameterRegressor.curve_inverse(350, cp=250, w_prime=20_000)
+        assert isinstance(tte, float)
+
+    def test_roundtrip_with_curve(self):
+        params = {"cp": 250, "w_prime": 20_000}
+        t_in = np.array([120, 300, 600])
+        power = TwoParameterRegressor.curve(t_in, **params)
+        t_out = TwoParameterRegressor.curve_inverse(power, **params)
+        np.testing.assert_allclose(t_out, t_in, rtol=1e-6)
+
+
 class TestTwoParameterRegressor:
     def test_fit_predict_roundtrip(self, two_param_data):
         X, y = two_param_data
@@ -56,9 +76,18 @@ class TestTwoParameterRegressor:
     def test_predict_inverse(self, two_param_data):
         X, y = two_param_data
         reg = TwoParameterRegressor().fit(X, y)
-        power, tte = reg.predict_inverse()
-        assert len(power) == len(tte)
+        power = np.array([300, 350, 400])
+        tte = reg.predict_inverse(power)
+        assert tte.shape == (3,)
         assert np.all(np.diff(tte) <= 0)
+
+    def test_predict_inverse_roundtrip(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor().fit(X, y)
+        power_in = np.array([300, 350, 400])
+        tte = reg.predict_inverse(power_in)
+        power_out = reg.predict(tte.reshape(-1, 1))
+        np.testing.assert_allclose(power_out, power_in, rtol=1e-6)
 
     def test_get_set_params(self):
         reg = TwoParameterRegressor(method="L-BFGS-B", max_iter=5000)

@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import brentq, minimize
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
@@ -41,7 +41,58 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
 
     @staticmethod
     def curve(t, **params):
+        """Evaluate the power-duration curve at given durations.
+
+        This is the mathematical model itself. It can be called directly as a
+        class method without fitting, when the model parameters are already
+        known.
+
+        Parameters
+        ----------
+        t : array-like
+            Durations in seconds.
+        **params
+            Model parameters as keyword arguments (e.g. cp=250, w_prime=20000).
+
+        Returns
+        -------
+        power : ndarray
+            Predicted power in watts.
+        """
         raise NotImplementedError
+
+    @classmethod
+    def curve_inverse(cls, y, **params):
+        """Evaluate the inverse: find the duration for a given power output.
+
+        Solves curve(t, ...) = y for t using root finding. This is the inverse
+        of curve(): given a power output, it returns how long that power can be
+        sustained.
+
+        The power values must be within the range of the model. For values at
+        or below critical power, the duration is theoretically infinite.
+
+        Parameters
+        ----------
+        y : array-like
+            Power values in watts.
+        **params
+            Model parameters as keyword arguments (e.g. cp=250, w_prime=20000).
+
+        Returns
+        -------
+        tte : ndarray
+            Time to exhaustion in seconds.
+        """
+        y = np.asarray(y, dtype=float)
+        scalar = y.ndim == 0
+        y = np.atleast_1d(y)
+
+        def solve_one(power):
+            return brentq(lambda t: cls.curve(t, **params) - power, 1, 1e7)
+
+        tte = np.array([solve_one(p) for p in y])
+        return float(tte[0]) if scalar else tte
 
     def _preprocess_data(self, X, y):
         """Validate, sort by duration ascending, and enforce monotonically decreasing power."""
@@ -99,6 +150,9 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
     def predict(self, X):
         """Predict power for given durations.
 
+        Uses the fitted model parameters. Equivalent to calling
+        ``curve(t, **fitted_params)``.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, 1)
@@ -113,33 +167,24 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
         X = check_array(X)
         return self.curve(X[:, 0], **self._fitted_params())
 
-    def predict_inverse(self, max_duration=7200):
-        """Predict time to exhaustion for a range of power outputs.
+    def predict_inverse(self, y):
+        """Predict time to exhaustion for given power outputs.
 
-        Generates a dense forward prediction, then interpolates to find the
-        duration at each integer watt from 1 W up to the predicted power at t=1s.
+        Uses the fitted model parameters. Equivalent to calling
+        ``curve_inverse(y, **fitted_params)``.
 
         Parameters
         ----------
-        max_duration : int, default=7200
-            Maximum duration in seconds to consider.
+        y : array-like of shape (n_samples,)
+            Power values in watts.
 
         Returns
         -------
-        power : ndarray
-            Power values in watts.
-        tte : ndarray
-            Corresponding time-to-exhaustion in seconds.
+        tte : ndarray of shape (n_samples,)
+            Time to exhaustion in seconds.
         """
         check_is_fitted(self)
-        t = np.arange(1, max_duration + 1)
-        predicted_power = self.predict(t.reshape(-1, 1))
-
-        max_power = int(predicted_power[0])
-        power = np.arange(1, max_power)
-        tte = np.interp(power, predicted_power[::-1], t[::-1])
-
-        return power, tte
+        return self.curve_inverse(y, **self._fitted_params())
 
     def _more_tags(self):
         return {"poor_score": True}
