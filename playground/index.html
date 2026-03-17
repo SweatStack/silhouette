@@ -118,6 +118,10 @@
         .model-header input[type="checkbox"] { accent-color: var(--model-color); }
         .model-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
         .model-label { flex: 1; font-weight: 500; }
+        .model-desc {
+            font-size: 0.7rem; color: #9ca3af; line-height: 1.3;
+            margin: 0.15rem 0 0 1.55rem;
+        }
 
         .model-hint {
             font-size: 0.75rem; color: #9ca3af;
@@ -334,7 +338,7 @@
     const STATE = {
         points: [],           // [{duration, power}, ...]
         curves: {},           // {modelName: {params, curve: {t, p}}}
-        modelVisible: { two_parameter: true, three_parameter: true, omni: true },
+        modelVisible: { two_parameter: true, two_parameter_work: true, three_parameter: true, omni: true },
         dialogMode: null,     // 'add' | 'edit'
         dialogIndex: -1,      // index of point being edited
         dragging: null,       // {index, startX, startY, origDuration, origPower}
@@ -346,9 +350,10 @@
     };
 
     const MODEL_META = {
-        two_parameter:   { label: '2-Parameter',   color: '#2563eb', min: 2, paramNames: ['cp', 'w_prime'] },
-        three_parameter: { label: '3-Parameter',   color: '#ea580c', min: 3, paramNames: ['cp', 'w_prime', 'p_max'] },
-        omni:            { label: 'Omni-Duration',  color: '#16a34a', min: 5, paramNames: ['cp', 'p_max', 'w_prime', 'a', 'tcp_max'] },
+        two_parameter:      { label: '2-Parameter',              desc: 'P = CP + W\u2032/t, fitted in power space',                           color: '#2563eb', min: 2, paramNames: ['cp', 'w_prime'] },
+        two_parameter_work: { label: '2-Parameter (work-duration)', desc: 'Same model, fitted in work space. Weights longer efforts more.', color: '#7c3aed', min: 2, paramNames: ['cp', 'w_prime'] },
+        three_parameter:    { label: '3-Parameter',              desc: 'Adds peak power (Pmax) to bound short durations',                    color: '#ea580c', min: 3, paramNames: ['cp', 'w_prime', 'p_max'] },
+        omni:               { label: 'Omni-Duration',            desc: 'Full model from sprints to multi-hour efforts',                      color: '#16a34a', min: 5, paramNames: ['cp', 'p_max', 'w_prime', 'a', 'tcp_max'] },
     };
 
     const PARAM_LABELS = {
@@ -1029,7 +1034,8 @@
                         onchange="STATE.modelVisible['${name}']=this.checked; draw()">
                     <span class="model-swatch" style="background: ${meta.color}"></span>
                     <span class="model-label">${meta.label}</span>
-                </div>`;
+                </div>
+                <div class="model-desc">${meta.desc}</div>`;
 
             if (!enough) {
                 const need = meta.min - n;
@@ -1168,6 +1174,7 @@ PowerDurationDisplay.from_estimator(reg, X, powers)`;
         const models = [];
         const names = [];
         if (pts.length >= 2) { models.push('two_param'); names.push('2-Parameter'); }
+        if (pts.length >= 2) { models.push('two_param_work'); names.push('2-Param (work)'); }
         if (pts.length >= 3) { models.push('three_param'); names.push('3-Parameter'); }
         if (pts.length >= 5) { models.push('omni'); names.push('Omni-Duration'); }
 
@@ -1192,6 +1199,11 @@ X = durations.reshape(-1, 1)
 two_param = TwoParameterRegressor()
 two_param.fit(X, powers)
 print(f"CP = {two_param.cp_:.0f} W, W' = {two_param.w_prime_:.0f} J")
+
+# Two-parameter model (work-duration linearization)
+two_param_work = TwoParameterRegressor(fitting="work_duration")
+two_param_work.fit(X, powers)
+print(f"CP = {two_param_work.cp_:.0f} W, W' = {two_param_work.w_prime_:.0f} J")
 `;
         }
 

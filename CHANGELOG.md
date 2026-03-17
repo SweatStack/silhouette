@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `fitting` parameter on `TwoParameterRegressor` with `"nonlinear"` (default) and `"work_duration"` options. The work-duration method linearizes the model to W = W' + CP·t and fits via OLS, minimizing error in work space rather than power space.
+- Interactive playground at [silhouette.sweatstack.no](https://silhouette.sweatstack.no) for fitting models in the browser.
 - `FPCARegressor` for data-driven power-duration modelling (Puchowicz & Skiba, 2025).
 - `percentiles()` and `z_scores()` on `FPCARegressor` for population comparison.
 - Pre-fitted population model shipped with the library.

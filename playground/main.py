@@ -32,16 +32,17 @@ from silhouette import (
 )
 
 models = {
-    "two_parameter": (TwoParameterRegressor, 2),
-    "three_parameter": (ThreeParameterRegressor, 3),
-    "omni": (OmniDurationRegressor, 5),
+    "two_parameter": (TwoParameterRegressor, 2, {}),
+    "two_parameter_work": (TwoParameterRegressor, 2, {"fitting": "work_duration"}),
+    "three_parameter": (ThreeParameterRegressor, 3, {}),
+    "omni": (OmniDurationRegressor, 5, {}),
 }
 
-for name, (Model, min_points) in models.items():
+for name, (Model, min_points, kwargs) in models.items():
     if len(durations) < min_points:
         continue
     try:
-        reg = Model()
+        reg = Model(**kwargs)
         reg.fit(X, powers)
         p_curve = reg.predict(t_curve.reshape(-1, 1))
         params = {}

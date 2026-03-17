@@ -94,3 +94,65 @@ class TestTwoParameterRegressor:
         params = reg.get_params()
         assert params["method"] == "L-BFGS-B"
         assert params["max_iter"] == 5000
+
+
+class TestFittingParameter:
+    def test_nonlinear_same_as_default(self, two_param_data):
+        X, y = two_param_data
+        reg_default = TwoParameterRegressor().fit(X, y)
+        reg_nonlinear = TwoParameterRegressor(fitting="nonlinear").fit(X, y)
+        assert reg_default.cp_ == pytest.approx(reg_nonlinear.cp_)
+        assert reg_default.w_prime_ == pytest.approx(reg_nonlinear.w_prime_)
+
+    def test_work_duration_produces_valid_params(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(fitting="work_duration").fit(X, y)
+        assert 200 < reg.cp_ < 300
+        assert 15_000 < reg.w_prime_ < 25_000
+
+    def test_work_duration_differs_from_nonlinear(self):
+        """With noisy data, work_duration and nonlinear produce different estimates."""
+        np.random.seed(42)
+        cp_true, w_prime_true = 250, 20_000
+        durations = np.array([120, 180, 300, 600, 1200])
+        power = cp_true + w_prime_true / durations + np.random.normal(0, 5, len(durations))
+        X = durations.reshape(-1, 1)
+
+        reg_nl = TwoParameterRegressor(fitting="nonlinear").fit(X, power)
+        reg_wd = TwoParameterRegressor(fitting="work_duration").fit(X, power)
+
+        # They should not be exactly equal with noisy data
+        assert reg_nl.cp_ != pytest.approx(reg_wd.cp_, abs=0.01)
+
+    def test_work_duration_with_bounds_warns(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(fitting="work_duration", bounds={"cp": (1, 500)})
+        with pytest.warns(UserWarning, match="bounds is ignored"):
+            reg.fit(X, y)
+
+    def test_work_duration_with_initial_params_warns(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(
+            fitting="work_duration", initial_params={"cp": 200}
+        )
+        with pytest.warns(UserWarning, match="initial_params is ignored"):
+            reg.fit(X, y)
+
+    def test_invalid_fitting_raises(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(fitting="invalid")
+        with pytest.raises(ValueError, match="Invalid fitting"):
+            reg.fit(X, y)
+
+    def test_predict_after_work_duration(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(fitting="work_duration").fit(X, y)
+        y_pred = reg.predict(X)
+        assert y_pred.shape == y.shape
+        # Predictions should be reasonable (close to actual for clean data)
+        np.testing.assert_allclose(y_pred, y, rtol=0.01)
+
+    def test_opt_result_is_none_for_work_duration(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(fitting="work_duration").fit(X, y)
+        assert reg.opt_result_ is None
