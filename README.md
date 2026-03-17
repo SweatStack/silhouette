@@ -93,6 +93,17 @@ reg = OmniDurationRegressor(
 )
 ```
 
+## Fitting methods
+
+`TwoParameterRegressor` supports an alternative fitting method that minimizes error in work space instead of power space:
+
+```python
+reg = TwoParameterRegressor(fitting="work_duration")
+reg.fit(X, power)
+```
+
+This linearizes the model to W = W' + CP·t and fits via OLS, giving more weight to longer durations. The default (`fitting="nonlinear"`) minimizes error in power space.
+
 ## Time to exhaustion
 
 The inverse of the power-duration curve: given a power, how long can it be sustained?
