@@ -1,5 +1,7 @@
 # Silhouette
 
+![Panda duration curve](docs/panda_duration_curve.png)
+
 A Python library for fitting power-duration curves to cycling data. Scikit-learn compatible.
 
 ## Models
@@ -102,6 +104,40 @@ tte = reg.predict_inverse(np.array([250, 300, 350]))
 # With known parameters
 tte = TwoParameterRegressor.curve_inverse(350, cp=250, w_prime=20_000)
 ```
+
+## Plotting
+
+Install with plotting support:
+
+```bash
+uv add silhouette[plotting]
+```
+
+Plot data with fitted models (sklearn Display pattern):
+
+```python
+from silhouette.plotting import PowerDurationDisplay
+
+# Single model
+display = PowerDurationDisplay.from_estimator(reg, durations.reshape(-1, 1), power)
+
+# Compare models
+display = PowerDurationDisplay.from_estimators(
+    [reg_2p, reg_omni], durations.reshape(-1, 1), power,
+)
+```
+
+![Power-Duration Models](docs/power_duration.png)
+
+FPCA mode of variance:
+
+```python
+from silhouette.plotting import ModeOfVarianceDisplay
+
+display = ModeOfVarianceDisplay.from_estimator(fpca_reg)
+```
+
+![Mode of Variance](docs/mode_of_variance.png)
 
 ## References
 

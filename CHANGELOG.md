@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `percentiles()` and `z_scores()` on `FPCARegressor` for population comparison.
 - Pre-fitted population model shipped with the library.
 - `fpca/` directory with training data and refitting scripts.
+- `PowerDurationDisplay` for plotting data with model curves (sklearn Display pattern).
+- `ModeOfVarianceDisplay` for FPCA mode of variance plots.
+- `matplotlib` as optional dependency (`silhouette[plotting]`).
 - `DEVELOPMENT.md` with contributor setup and FPCA refitting instructions.
 
 ## [0.3.0] - 2026-03-17

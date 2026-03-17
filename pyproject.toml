@@ -13,9 +13,13 @@ dependencies = [
     "scikit-learn>=1.4.0",
 ]
 
+[project.optional-dependencies]
+plotting = ["matplotlib>=3.6.0"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "matplotlib>=3.6.0",
 ]
 
 [build-system]
