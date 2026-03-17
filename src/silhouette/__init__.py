@@ -1,2 +1,3 @@
-def hello() -> str:
-    return "Hello from silhouette!"
+from silhouette.omni import OmniDurationRegressor
+
+__all__ = ["OmniDurationRegressor"]
