@@ -11,7 +11,7 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
         _PARAM_ORDER: tuple of parameter names
         _DEFAULT_BOUNDS: dict of parameter bounds
         _DEFAULT_INITIAL_PARAMS: dict of initial parameter estimates
-        _model(t, ...): static method computing the power-duration curve
+        curve(t, **params): static method computing the power-duration curve
     """
 
     _PARAM_ORDER = ()
@@ -36,8 +36,11 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
             merged.update(self.initial_params)
         return [merged[k] for k in self._PARAM_ORDER]
 
+    def _fitted_params(self):
+        return {name: getattr(self, f"{name}_") for name in self._PARAM_ORDER}
+
     @staticmethod
-    def _model(t, *params):
+    def curve(t, **params):
         raise NotImplementedError
 
     def _preprocess_data(self, X, y):
@@ -71,10 +74,11 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
         self
         """
         X, y = self._preprocess_data(X, y)
+        t = X[:, 0]
 
-        def objective(params):
-            prediction = self._model(X[:, 0], *params)
-            return self._cost_function(prediction, y)
+        def objective(values):
+            params = dict(zip(self._PARAM_ORDER, values))
+            return self._cost_function(self.curve(t, **params), y)
 
         result = minimize(
             objective,
@@ -107,8 +111,7 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
         """
         check_is_fitted(self)
         X = check_array(X)
-        params = [getattr(self, f"{name}_") for name in self._PARAM_ORDER]
-        return self._model(X[:, 0], *params)
+        return self.curve(X[:, 0], **self._fitted_params())
 
     def predict_inverse(self, max_duration=7200):
         """Predict time to exhaustion for a range of power outputs.

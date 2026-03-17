@@ -4,6 +4,25 @@ import pytest
 from silhouette import TwoParameterRegressor
 
 
+class TestCurve:
+    def test_known_params(self):
+        t = np.array([120, 300, 600])
+        power = TwoParameterRegressor.curve(t, cp=250, w_prime=20_000)
+        expected = 250 + 20_000 / t
+        np.testing.assert_allclose(power, expected)
+
+    def test_scalar_input(self):
+        power = TwoParameterRegressor.curve(300, cp=250, w_prime=20_000)
+        assert float(power) == pytest.approx(250 + 20_000 / 300)
+
+    def test_matches_fitted_predict(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor().fit(X, y)
+        from_curve = TwoParameterRegressor.curve(X[:, 0], cp=reg.cp_, w_prime=reg.w_prime_)
+        from_predict = reg.predict(X)
+        np.testing.assert_allclose(from_curve, from_predict)
+
+
 class TestTwoParameterRegressor:
     def test_fit_predict_roundtrip(self, two_param_data):
         X, y = two_param_data

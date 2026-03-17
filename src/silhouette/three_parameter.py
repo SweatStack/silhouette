@@ -48,7 +48,8 @@ class ThreeParameterRegressor(BaseRegressor):
     _DEFAULT_INITIAL_PARAMS = {"cp": 300, "w_prime": 20_000, "p_max": 1000}
 
     @staticmethod
-    def _model(t, cp, w_prime, p_max):
+    def curve(t, *, cp, w_prime, p_max):
+        t = np.asarray(t)
         numerator = w_prime * p_max + t * cp * (p_max - cp)
         denominator = w_prime + t * (p_max - cp)
         return numerator / denominator

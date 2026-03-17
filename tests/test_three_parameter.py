@@ -4,6 +4,28 @@ import pytest
 from silhouette import ThreeParameterRegressor
 
 
+class TestCurve:
+    def test_known_params(self):
+        t = np.array([5, 60, 600])
+        power = ThreeParameterRegressor.curve(t, cp=250, w_prime=20_000, p_max=1100)
+        num = 20_000 * 1100 + t * 250 * (1100 - 250)
+        den = 20_000 + t * (1100 - 250)
+        np.testing.assert_allclose(power, num / den)
+
+    def test_scalar_input(self):
+        power = ThreeParameterRegressor.curve(300, cp=250, w_prime=20_000, p_max=1100)
+        assert isinstance(float(power), float)
+
+    def test_matches_fitted_predict(self, three_param_data):
+        X, y = three_param_data
+        reg = ThreeParameterRegressor().fit(X, y)
+        from_curve = ThreeParameterRegressor.curve(
+            X[:, 0], cp=reg.cp_, w_prime=reg.w_prime_, p_max=reg.p_max_,
+        )
+        from_predict = reg.predict(X)
+        np.testing.assert_allclose(from_curve, from_predict)
+
+
 class TestThreeParameterRegressor:
     def test_fit_predict_roundtrip(self, three_param_data):
         X, y = three_param_data

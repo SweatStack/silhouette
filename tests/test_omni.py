@@ -4,6 +4,33 @@ import pytest
 from silhouette import OmniDurationRegressor
 
 
+class TestCurve:
+    def test_known_params(self):
+        t = np.array([60, 1800, 3600])
+        power = OmniDurationRegressor.curve(
+            t, cp=250, p_max=1100, w_prime=20_000, a=40, tcp_max=1800,
+        )
+        assert len(power) == 3
+        assert power[0] > power[1] > power[2]
+
+    def test_scalar_input(self):
+        power = OmniDurationRegressor.curve(
+            300, cp=250, p_max=1100, w_prime=20_000, a=40, tcp_max=1800,
+        )
+        assert isinstance(float(power), float)
+
+    def test_matches_fitted_predict(self, omni_data):
+        X, y = omni_data
+        reg = OmniDurationRegressor().fit(X, y)
+        from_curve = OmniDurationRegressor.curve(
+            X[:, 0],
+            cp=reg.cp_, p_max=reg.p_max_, w_prime=reg.w_prime_,
+            a=reg.a_, tcp_max=reg.tcp_max_,
+        )
+        from_predict = reg.predict(X)
+        np.testing.assert_allclose(from_curve, from_predict)
+
+
 class TestOmniDurationRegressor:
     def test_fit_predict_roundtrip(self, omni_data):
         X, y = omni_data

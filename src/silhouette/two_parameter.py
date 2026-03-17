@@ -43,5 +43,6 @@ class TwoParameterRegressor(BaseRegressor):
     _DEFAULT_INITIAL_PARAMS = {"cp": 300, "w_prime": 20_000}
 
     @staticmethod
-    def _model(t, cp, w_prime):
+    def curve(t, *, cp, w_prime):
+        t = np.asarray(t)
         return cp + w_prime / t

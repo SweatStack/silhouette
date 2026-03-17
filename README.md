@@ -43,6 +43,17 @@ reg.predict(np.array([[300]]))  # predicted power at 5 minutes
 
 All three models share the same interface. Swap `OmniDurationRegressor` for `TwoParameterRegressor` or `ThreeParameterRegressor` and the code works the same way.
 
+## Known parameters
+
+When parameters are already known, use `curve` directly without fitting:
+
+```python
+from silhouette import TwoParameterRegressor
+
+t = np.arange(1, 3601)
+power = TwoParameterRegressor.curve(t, cp=250, w_prime=20_000)
+```
+
 ## Custom bounds
 
 ```python

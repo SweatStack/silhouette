@@ -72,6 +72,7 @@ class OmniDurationRegressor(BaseRegressor):
     }
 
     @staticmethod
-    def _model(t, cp, p_max, w_prime, a, tcp_max):
+    def curve(t, *, cp, p_max, w_prime, a, tcp_max):
+        t = np.asarray(t)
         base = w_prime / t * (1 - np.exp(-t * (p_max - cp) / w_prime)) + cp
         return np.where(t <= tcp_max, base, base - a * np.log(t / tcp_max))
