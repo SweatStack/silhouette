@@ -1,8 +1,6 @@
 # Silhouette
 
-![Panda duration curve](docs/panda_duration_curve.png)
-
-A Python library for fitting power-duration curves to cycling data. Scikit-learn compatible.
+The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible.
 
 ## Models
 
