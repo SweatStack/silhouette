@@ -1,4 +1,4 @@
-.PHONY: build publish test
+.PHONY: build publish test deploy
 
 
 build:
@@ -10,3 +10,6 @@ test:
 
 publish: build
 	uvx twine upload dist/*
+
+deploy:
+	npx wrangler pages deploy

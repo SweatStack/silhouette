@@ -19,10 +19,9 @@ powers = np.array(data["powers"], dtype=float)
 
 X = durations.reshape(-1, 1)
 
-# Curve evaluation range — extend slightly beyond data
-t_min = max(1, durations.min() * 0.5)
+# Curve evaluation range — always start at t=1, extend beyond data
 t_max = min(7200, durations.max() * 2)
-t_curve = np.logspace(np.log10(t_min), np.log10(t_max), 300)
+t_curve = np.logspace(0, np.log10(t_max), 300)
 
 results = {}
 

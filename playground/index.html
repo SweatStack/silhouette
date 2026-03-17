@@ -340,6 +340,9 @@
         dragging: null,       // {index, startX, startY, origDuration, origPower}
         hasDragged: false,
         pythonReady: false,
+        hover: null,          // {x, y} canvas pos or null
+        zoomSelect: null,     // {startX, startY, endX, endY} canvas pos or null
+        zoom: null,           // {xMin, xMax, yMin, yMax} in data coords or null
     };
 
     const MODEL_META = {
@@ -363,33 +366,44 @@
 
     let W, H, dpr;  // logical size and device pixel ratio
 
-    const X_RANGE = [1, 7200];
-    let yMax = 1500;
+    const X_RANGE_DEFAULT = [1, 7200];
+    let yMaxDefault = 1500;
 
     const X_TICKS = [1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200];
     const X_LABELS = ['1s','2s','5s','10s','20s','30s','1m','2m','5m','10m','20m','30m','1h','2h'];
 
+    function xRange() {
+        return STATE.zoom ? [STATE.zoom.xMin, STATE.zoom.xMax] : X_RANGE_DEFAULT;
+    }
+    function yRange() {
+        return STATE.zoom ? [STATE.zoom.yMin, STATE.zoom.yMax] : [0, yMaxDefault];
+    }
+
     function toX(duration) {
-        const logMin = Math.log10(X_RANGE[0]), logMax = Math.log10(X_RANGE[1]);
+        const [xMin, xMax] = xRange();
+        const logMin = Math.log10(xMin), logMax = Math.log10(xMax);
         const plotW = W - margin.left - margin.right;
         return margin.left + (Math.log10(duration) - logMin) / (logMax - logMin) * plotW;
     }
 
     function toY(power) {
+        const [yMin, yMax] = yRange();
         const plotH = H - margin.top - margin.bottom;
-        return margin.top + (1 - power / yMax) * plotH;
+        return margin.top + (1 - (power - yMin) / (yMax - yMin)) * plotH;
     }
 
     function fromX(x) {
-        const logMin = Math.log10(X_RANGE[0]), logMax = Math.log10(X_RANGE[1]);
+        const [xMin, xMax] = xRange();
+        const logMin = Math.log10(xMin), logMax = Math.log10(xMax);
         const plotW = W - margin.left - margin.right;
         const ratio = (x - margin.left) / plotW;
         return Math.pow(10, logMin + ratio * (logMax - logMin));
     }
 
     function fromY(y) {
+        const [yMin, yMax] = yRange();
         const plotH = H - margin.top - margin.bottom;
-        return yMax * (1 - (y - margin.top) / plotH);
+        return yMin + (yMax - yMin) * (1 - (y - margin.top) / plotH);
     }
 
     function resizeCanvas() {
@@ -410,7 +424,7 @@
     function updateYRange() {
         let maxP = 0;
         STATE.points.forEach(p => { if (p.power > maxP) maxP = p.power; });
-        yMax = Math.max(1500, Math.ceil(maxP * 1.2 / 100) * 100);
+        yMaxDefault = Math.max(1500, Math.ceil(maxP * 1.2 / 100) * 100);
     }
 
     function draw() {
@@ -418,6 +432,8 @@
 
         const pL = margin.left, pR = W - margin.right;
         const pT = margin.top, pB = H - margin.bottom;
+        const [xMin, xMax] = xRange();
+        const [yMin, yMax] = yRange();
 
         // Plot background
         ctx.fillStyle = '#fafafa';
@@ -431,7 +447,7 @@
         // X grid + labels
         ctx.textAlign = 'center';
         X_TICKS.forEach((t, i) => {
-            if (t < X_RANGE[0] || t > X_RANGE[1]) return;
+            if (t < xMin || t > xMax) return;
             const x = Math.round(toX(t)) + 0.5;
             ctx.beginPath(); ctx.moveTo(x, pT); ctx.lineTo(x, pB); ctx.stroke();
             ctx.fillStyle = '#9ca3af';
@@ -439,9 +455,11 @@
         });
 
         // Y grid + labels
-        const yStep = yMax <= 500 ? 50 : yMax <= 1000 ? 100 : 200;
+        const ySpan = yMax - yMin;
+        const yStep = ySpan <= 200 ? 25 : ySpan <= 500 ? 50 : ySpan <= 1000 ? 100 : 200;
+        const yStart = Math.ceil(yMin / yStep) * yStep;
         ctx.textAlign = 'right';
-        for (let p = 0; p <= yMax; p += yStep) {
+        for (let p = yStart; p <= yMax; p += yStep) {
             const y = Math.round(toY(p)) + 0.5;
             ctx.beginPath(); ctx.moveTo(pL, y); ctx.lineTo(pR, y); ctx.stroke();
             ctx.fillStyle = '#9ca3af';
@@ -500,8 +518,35 @@
             ctx.stroke();
         });
 
+        // Hover crosshair + tooltip
+        if (STATE.hover && inPlotArea(STATE.hover) && !STATE.dragging && !STATE.zoomSelect) {
+            drawHover(pL, pR, pT, pB);
+        }
+
+        // Zoom selection rectangle
+        if (STATE.zoomSelect) {
+            const zs = STATE.zoomSelect;
+            const rx = Math.min(zs.startX, zs.endX), ry = Math.min(zs.startY, zs.endY);
+            const rw = Math.abs(zs.endX - zs.startX), rh = Math.abs(zs.endY - zs.startY);
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.08)';
+            ctx.fillRect(rx, ry, rw, rh);
+            ctx.strokeStyle = 'rgba(37, 99, 235, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.strokeRect(rx, ry, rw, rh);
+            ctx.setLineDash([]);
+        }
+
+        // Zoom reset hint
+        if (STATE.zoom) {
+            ctx.fillStyle = '#9ca3af';
+            ctx.font = '11px system-ui, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('Double-click to reset zoom', pR, pT - 6);
+        }
+
         // Empty state hint
-        if (STATE.points.length === 0 && STATE.pythonReady) {
+        if (STATE.points.length === 0 && STATE.pythonReady && !STATE.zoom) {
             ctx.fillStyle = '#9ca3af';
             ctx.font = '14px system-ui, sans-serif';
             ctx.textAlign = 'center';
@@ -517,6 +562,98 @@
             ctx.textAlign = 'center';
             ctx.fillText('Loading Python\u2026', (pL + pR) / 2, (pT + pB) / 2);
         }
+    }
+
+    // =========================================================================
+    // Hover tooltip
+    // =========================================================================
+
+    function sampleCurveAt(curveData, duration) {
+        // Binary search for the closest point in the curve, then interpolate
+        const { t, p } = curveData;
+        if (duration <= t[0]) return p[0];
+        if (duration >= t[t.length - 1]) return p[t.length - 1];
+        let lo = 0, hi = t.length - 1;
+        while (hi - lo > 1) {
+            const mid = (lo + hi) >> 1;
+            if (t[mid] <= duration) lo = mid; else hi = mid;
+        }
+        const frac = (Math.log10(duration) - Math.log10(t[lo])) / (Math.log10(t[hi]) - Math.log10(t[lo]));
+        return p[lo] + frac * (p[hi] - p[lo]);
+    }
+
+    function drawHover(pL, pR, pT, pB) {
+        const hx = STATE.hover.x;
+        const dur = fromX(hx);
+
+        // Vertical crosshair line
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(hx, pT);
+        ctx.lineTo(hx, pB);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Collect values from visible curves
+        const items = [];
+        for (const [name, data] of Object.entries(STATE.curves)) {
+            if (!STATE.modelVisible[name] || !data.curve) continue;
+            const power = sampleCurveAt(data.curve, dur);
+            items.push({ name, color: MODEL_META[name].color, label: MODEL_META[name].label, power });
+
+            // Draw dot on curve
+            const dy = toY(power);
+            if (dy >= pT && dy <= pB) {
+                ctx.beginPath();
+                ctx.arc(hx, dy, 4, 0, Math.PI * 2);
+                ctx.fillStyle = MODEL_META[name].color;
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        if (items.length === 0) return;
+
+        // Tooltip
+        ctx.font = '11px system-ui, sans-serif';
+        const durLabel = formatDuration(Math.round(dur));
+        const lines = [durLabel, ...items.map(it => `${it.label}: ${Math.round(it.power)}W`)];
+        const lineH = 16;
+        const pad = 8;
+        const maxW = Math.max(...lines.map(l => ctx.measureText(l).width));
+        const tipW = maxW + pad * 2;
+        const tipH = lines.length * lineH + pad * 2 - 4;
+
+        let tx = hx + 12;
+        if (tx + tipW > pR) tx = hx - tipW - 12;
+        let ty = pT + 12;
+
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.strokeStyle = '#d1d5db';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(tx, ty, tipW, tipH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = 'left';
+        // Duration header
+        ctx.fillStyle = '#374151';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fontWeight = '600';
+        ctx.fillText(durLabel, tx + pad, ty + pad + 10);
+        // Curve values
+        items.forEach((it, i) => {
+            const ly = ty + pad + 10 + (i + 1) * lineH;
+            ctx.fillStyle = it.color;
+            ctx.fillRect(tx + pad, ly - 7, 8, 3);
+            ctx.fillStyle = '#374151';
+            ctx.fillText(`${it.label}: ${Math.round(it.power)}W`, tx + pad + 12, ly);
+        });
     }
 
     // =========================================================================
@@ -542,6 +679,8 @@
             && pos.y >= margin.top && pos.y <= H - margin.bottom;
     }
 
+    let mouseDownPos = null;  // track mousedown for click-vs-drag on empty area
+
     canvas.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
         const pos = getCanvasPos(e);
@@ -549,6 +688,7 @@
 
         const idx = hitTest(pos);
         if (idx >= 0) {
+            // Start point drag
             STATE.dragging = {
                 index: idx,
                 startX: e.clientX, startY: e.clientY,
@@ -557,20 +697,26 @@
             };
             STATE.hasDragged = false;
             e.preventDefault();
+        } else {
+            // Potential zoom selection or click-to-add
+            mouseDownPos = { x: pos.x, y: pos.y, clientX: e.clientX, clientY: e.clientY };
         }
     });
 
     canvas.addEventListener('mousemove', (e) => {
         const pos = getCanvasPos(e);
 
+        // Point dragging
         if (STATE.dragging) {
             const dx = e.clientX - STATE.dragging.startX;
             const dy = e.clientY - STATE.dragging.startY;
             if (Math.abs(dx) + Math.abs(dy) > 4) STATE.hasDragged = true;
 
             if (STATE.hasDragged && inPlotArea(pos)) {
+                const [xMin, xMax] = xRange();
+                const [yLo, yHi] = yRange();
                 const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
-                const pow = Math.max(0, Math.min(yMax, fromY(pos.y)));
+                const pow = Math.max(0, fromY(pos.y));
                 STATE.points[STATE.dragging.index].duration = Math.round(dur);
                 STATE.points[STATE.dragging.index].power = Math.round(pow);
                 draw();
@@ -578,17 +724,41 @@
             return;
         }
 
-        // Cursor style
-        if (inPlotArea(pos) && hitTest(pos) >= 0) {
-            canvas.style.cursor = 'grab';
-        } else if (inPlotArea(pos)) {
-            canvas.style.cursor = 'crosshair';
+        // Zoom selection
+        if (mouseDownPos) {
+            const dx = pos.x - mouseDownPos.x, dy = pos.y - mouseDownPos.y;
+            if (Math.abs(dx) + Math.abs(dy) > 5) {
+                // Clamp to plot area
+                const clampX = v => Math.max(margin.left, Math.min(W - margin.right, v));
+                const clampY = v => Math.max(margin.top, Math.min(H - margin.bottom, v));
+                STATE.zoomSelect = {
+                    startX: clampX(mouseDownPos.x), startY: clampY(mouseDownPos.y),
+                    endX: clampX(pos.x), endY: clampY(pos.y),
+                };
+                STATE.hover = null;
+                canvas.style.cursor = 'crosshair';
+                draw();
+            }
+            return;
+        }
+
+        // Hover
+        if (inPlotArea(pos)) {
+            STATE.hover = pos;
+            if (hitTest(pos) >= 0) {
+                canvas.style.cursor = 'grab';
+            } else {
+                canvas.style.cursor = 'crosshair';
+            }
+            draw();
         } else {
+            if (STATE.hover) { STATE.hover = null; draw(); }
             canvas.style.cursor = 'default';
         }
     });
 
     canvas.addEventListener('mouseup', (e) => {
+        // Point drag end
         if (STATE.dragging) {
             const wasDrag = STATE.hasDragged;
             const idx = STATE.dragging.index;
@@ -599,19 +769,54 @@
                 return;
             }
 
-            // Click on point → edit dialog
             openEditDialog(idx, e.clientX, e.clientY);
             return;
         }
 
-        const pos = getCanvasPos(e);
-        if (!inPlotArea(pos)) return;
-        if (hitTest(pos) >= 0) return;
+        // Zoom selection end
+        if (STATE.zoomSelect) {
+            const zs = STATE.zoomSelect;
+            STATE.zoomSelect = null;
+            mouseDownPos = null;
+
+            const x1 = fromX(Math.min(zs.startX, zs.endX));
+            const x2 = fromX(Math.max(zs.startX, zs.endX));
+            const y1 = fromY(Math.max(zs.startY, zs.endY));  // max Y = lower power
+            const y2 = fromY(Math.min(zs.startY, zs.endY));  // min Y = higher power
+
+            // Only zoom if selection is meaningful
+            if (x2 / x1 > 1.1 || y2 - y1 > 10) {
+                STATE.zoom = { xMin: Math.max(1, x1), xMax: Math.min(7200, x2), yMin: Math.max(0, y1), yMax: y2 };
+            }
+            draw();
+            return;
+        }
 
         // Click on empty area → add dialog
-        const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
-        const pow = Math.max(0, Math.min(yMax, fromY(pos.y)));
-        openAddDialogAt(Math.round(dur), Math.round(pow), e.clientX, e.clientY);
+        if (mouseDownPos) {
+            const pos = getCanvasPos(e);
+            mouseDownPos = null;
+            if (!inPlotArea(pos)) return;
+            if (hitTest(pos) >= 0) return;
+
+            const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
+            const pow = Math.max(0, fromY(pos.y));
+            openAddDialogAt(Math.round(dur), Math.round(pow), e.clientX, e.clientY);
+        }
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        mouseDownPos = null;
+        if (STATE.zoomSelect) { STATE.zoomSelect = null; draw(); }
+        if (STATE.hover) { STATE.hover = null; draw(); }
+    });
+
+    canvas.addEventListener('dblclick', (e) => {
+        if (STATE.zoom) {
+            STATE.zoom = null;
+            draw();
+            e.preventDefault();
+        }
     });
 
     // Touch support
@@ -644,7 +849,7 @@
 
         if (STATE.hasDragged && inPlotArea(pos)) {
             const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
-            const pow = Math.max(0, Math.min(yMax, fromY(pos.y)));
+            const pow = Math.max(0, fromY(pos.y));
             STATE.points[STATE.dragging.index].duration = Math.round(dur);
             STATE.points[STATE.dragging.index].power = Math.round(pow);
             draw();
