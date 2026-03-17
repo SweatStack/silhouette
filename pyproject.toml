@@ -1,0 +1,14 @@
+[project]
+name = "silhouette"
+version = "0.1.0"
+description = "Silhouette is the Python library for intensity duration modelling in endurance sports."
+readme = "README.md"
+authors = [
+    { name = "Aart Goossens", email = "aart@sweatstack.no" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
