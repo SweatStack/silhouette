@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -156,3 +158,128 @@ class TestFittingParameter:
         X, y = two_param_data
         reg = TwoParameterRegressor(fitting="work_duration").fit(X, y)
         assert reg.opt_result_ is None
+
+
+class TestDurationRange:
+    def test_filters_data(self):
+        """Only data within the range should be used for fitting."""
+        cp, w_prime = 250, 20_000
+        durations = np.array([30, 120, 300, 600, 1200, 3600])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(duration_range=(120, 900)).fit(X, power)
+        # 30s and 1200s and 3600s are outside range
+        assert reg.duration_mask_.sum() == 3  # 120, 300, 600
+        assert 200 < reg.cp_ < 300
+
+    def test_predict_works_outside_range(self):
+        """predict() should work at any duration, even outside the fitted range."""
+        cp, w_prime = 250, 20_000
+        durations = np.array([120, 300, 600])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(duration_range=(120, 900)).fit(X, power)
+        # Predict at 5s and 3600s — outside the fitting range
+        y_pred = reg.predict(np.array([[5], [3600]]))
+        assert y_pred.shape == (2,)
+        assert y_pred[0] > y_pred[1]  # shorter duration = more power
+
+    def test_duration_mask_attribute(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor(duration_range=(120, 900)).fit(X, y)
+        assert hasattr(reg, 'duration_mask_')
+        assert reg.duration_mask_.dtype == bool
+        assert len(reg.duration_mask_) == len(X)
+
+    def test_mask_all_true_when_no_range(self, two_param_data):
+        X, y = two_param_data
+        reg = TwoParameterRegressor().fit(X, y)
+        assert reg.duration_mask_.all()
+
+    def test_one_sided_lower(self):
+        cp, w_prime = 250, 20_000
+        durations = np.array([30, 60, 120, 300, 600])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(duration_range=(120, None)).fit(X, power)
+        assert reg.duration_mask_.sum() == 3  # 120, 300, 600
+
+    def test_one_sided_upper(self):
+        cp, w_prime = 250, 20_000
+        durations = np.array([120, 300, 600, 1200, 3600])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(duration_range=(None, 900)).fit(X, power)
+        assert reg.duration_mask_.sum() == 3  # 120, 300, 600
+
+    def test_too_few_samples_after_filter(self):
+        durations = np.array([30, 60, 3600, 7200])
+        power = np.array([500, 400, 260, 255])
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(duration_range=(120, 900))
+        with pytest.raises(ValueError, match="duration_range.*filters"):
+            reg.fit(X, power)
+
+    def test_warns_outside_recommended_range(self):
+        """Should warn when data is outside the recommended range and duration_range is not set."""
+        cp, w_prime = 250, 20_000
+        durations = np.array([5, 120, 300, 600, 3600])  # 5s and 3600s are outside
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor()
+        with pytest.warns(UserWarning, match="designed for durations between"):
+            reg.fit(X, power)
+
+    def test_no_warning_when_data_in_range(self, two_param_data):
+        """Should not warn when all data is within the recommended range."""
+        X, y = two_param_data  # durations: 120, 180, 300, 600, 1200
+        # 1200 > 900 so this will actually warn. Use a subset.
+        mask = X[:, 0] <= 900
+        reg = TwoParameterRegressor()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            reg.fit(X[mask], y[mask])
+
+    def test_no_warning_when_duration_range_set(self):
+        """Should not warn when duration_range is explicitly set, even if data is outside."""
+        cp, w_prime = 250, 20_000
+        durations = np.array([5, 120, 300, 600, 3600])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(duration_range=(120, 900))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            reg.fit(X, power)
+
+    def test_works_with_work_duration_fitting(self):
+        cp, w_prime = 250, 20_000
+        durations = np.array([30, 120, 300, 600, 3600])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        reg = TwoParameterRegressor(
+            fitting="work_duration", duration_range=(120, 900)
+        ).fit(X, power)
+        assert reg.duration_mask_.sum() == 3
+        assert 200 < reg.cp_ < 300
+
+    def test_gridsearchable(self):
+        """duration_range should work with sklearn GridSearchCV."""
+        from sklearn.model_selection import GridSearchCV
+
+        cp, w_prime = 250, 20_000
+        durations = np.array([60, 120, 180, 300, 600, 900, 1200])
+        power = cp + w_prime / durations
+        X = durations.reshape(-1, 1)
+
+        param_grid = {"duration_range": [(120, 600), (120, 900), (60, 1200)]}
+        gs = GridSearchCV(TwoParameterRegressor(), param_grid, cv=2)
+        gs.fit(X, power)
+        assert hasattr(gs, "best_params_")

@@ -36,6 +36,13 @@ class TwoParameterRegressor(BaseRegressor):
     ----------
     fitting : str, default="nonlinear"
         Fitting method. One of ``"nonlinear"`` or ``"work_duration"``.
+    duration_range : tuple of (float, float), optional
+        Duration range ``(min_seconds, max_seconds)`` to use for fitting.
+        Data points outside this range are excluded from the fit but
+        ``predict()`` still works at any duration. Either bound can be
+        ``None`` for one-sided filtering. If not set, all data is used
+        but a warning is issued when data falls outside the recommended
+        range of 2 to 15 minutes.
     bounds : dict, optional
         Parameter bounds for optimization. Keys are "cp" and "w_prime".
         Ignored when ``fitting="work_duration"``.
@@ -55,6 +62,9 @@ class TwoParameterRegressor(BaseRegressor):
         Critical power (W).
     w_prime_ : float
         Anaerobic work capacity (J).
+    duration_mask_ : ndarray of bool
+        Boolean mask indicating which training samples were used after
+        applying ``duration_range``.
     opt_result_ : scipy.optimize.OptimizeResult or None
         Raw optimizer result. ``None`` when ``fitting="work_duration"``.
 
@@ -67,11 +77,13 @@ class TwoParameterRegressor(BaseRegressor):
     _PARAM_ORDER = ("cp", "w_prime")
     _DEFAULT_BOUNDS = {"cp": (1, 800), "w_prime": (500, 40_000)}
     _DEFAULT_INITIAL_PARAMS = {"cp": 300, "w_prime": 20_000}
+    _RECOMMENDED_DURATION_RANGE = (120, 900)
 
-    def __init__(self, fitting="nonlinear", bounds=None, initial_params=None,
-                 method="Nelder-Mead", max_iter=10_000):
-        super().__init__(bounds=bounds, initial_params=initial_params,
-                         method=method, max_iter=max_iter)
+    def __init__(self, fitting="nonlinear", duration_range=None, bounds=None,
+                 initial_params=None, method="Nelder-Mead", max_iter=10_000):
+        super().__init__(duration_range=duration_range, bounds=bounds,
+                         initial_params=initial_params, method=method,
+                         max_iter=max_iter)
         self.fitting = fitting
 
     def fit(self, X, y):

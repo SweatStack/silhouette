@@ -46,6 +46,7 @@ class ThreeParameterRegressor(BaseRegressor):
     _PARAM_ORDER = ("cp", "w_prime", "p_max")
     _DEFAULT_BOUNDS = {"cp": (1, 800), "w_prime": (500, 60_000), "p_max": (500, 2000)}
     _DEFAULT_INITIAL_PARAMS = {"cp": 300, "w_prime": 20_000, "p_max": 1000}
+    _RECOMMENDED_DURATION_RANGE = (None, 900)
 
     @staticmethod
     def curve(t, *, cp, w_prime, p_max):

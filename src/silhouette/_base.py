@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from scipy.optimize import brentq, minimize
 from sklearn.base import BaseEstimator, RegressorMixin
@@ -12,13 +14,19 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
         _DEFAULT_BOUNDS: dict of parameter bounds
         _DEFAULT_INITIAL_PARAMS: dict of initial parameter estimates
         curve(t, **params): static method computing the power-duration curve
+
+    Subclasses may define:
+        _RECOMMENDED_DURATION_RANGE: tuple of (min_seconds, max_seconds) or None
     """
 
     _PARAM_ORDER = ()
     _DEFAULT_BOUNDS = {}
     _DEFAULT_INITIAL_PARAMS = {}
+    _RECOMMENDED_DURATION_RANGE = None
 
-    def __init__(self, bounds=None, initial_params=None, method="Nelder-Mead", max_iter=10_000):
+    def __init__(self, duration_range=None, bounds=None, initial_params=None,
+                 method="Nelder-Mead", max_iter=10_000):
+        self.duration_range = duration_range
         self.bounds = bounds
         self.initial_params = initial_params
         self.method = method
@@ -95,17 +103,78 @@ class BaseRegressor(RegressorMixin, BaseEstimator):
         return float(tte[0]) if scalar else tte
 
     def _preprocess_data(self, X, y):
-        """Validate, sort by duration ascending, and enforce monotonically decreasing power."""
+        """Validate, filter by duration range, sort, and enforce monotonically decreasing power."""
         X, y = check_X_y(X, y, ensure_min_samples=2)
 
         order = np.argsort(X[:, 0])
         X = X[order]
         y = y[order]
 
+        # Apply duration_range filter
+        if self.duration_range is not None:
+            lo, hi = self.duration_range
+            mask = np.ones(len(X), dtype=bool)
+            if lo is not None:
+                mask &= X[:, 0] >= lo
+            if hi is not None:
+                mask &= X[:, 0] <= hi
+            self.duration_mask_ = mask
+            X = X[mask]
+            y = y[mask]
+            if len(X) < 2:
+                raise ValueError(
+                    f"duration_range={self.duration_range} filters the data "
+                    f"to {len(X)} sample(s), but at least 2 are required."
+                )
+        else:
+            self.duration_mask_ = np.ones(len(X), dtype=bool)
+            # Warn if data falls outside the recommended range
+            self._warn_recommended_range(X[:, 0])
+
         # Enforce monotonically decreasing: walk backwards and take cumulative max
         y = np.maximum.accumulate(y[::-1])[::-1]
 
         return X, y
+
+    def _warn_recommended_range(self, durations):
+        """Issue a warning if data is outside the model's recommended duration range."""
+        rec = self._RECOMMENDED_DURATION_RANGE
+        if rec is None:
+            return
+        lo, hi = rec
+        outside = np.zeros(len(durations), dtype=bool)
+        if lo is not None:
+            outside |= durations < lo
+        if hi is not None:
+            outside |= durations > hi
+        if not np.any(outside):
+            return
+
+        def fmt(s):
+            if s is None:
+                return None
+            if s < 60:
+                return f"{s}s"
+            return f"{s // 60}min" if s % 60 == 0 else f"{s // 60}min {s % 60}s"
+
+        lo_str, hi_str = fmt(lo), fmt(hi)
+        if lo_str and hi_str:
+            range_str = f"between {lo_str} and {hi_str}"
+        elif lo_str:
+            range_str = f"above {lo_str}"
+        else:
+            range_str = f"up to {hi_str}"
+
+        n_out = int(np.sum(outside))
+        warnings.warn(
+            f"{self.__class__.__name__} is designed for durations "
+            f"{range_str}. {n_out} of {len(durations)} data point(s) fall "
+            f"outside this range. Set duration_range={rec} to restrict "
+            f"fitting to this range, or set duration_range to a custom "
+            f"range to suppress this warning.",
+            UserWarning,
+            stacklevel=4,
+        )
 
     def _cost_function(self, prediction, y):
         return np.mean((prediction - y) ** 2)

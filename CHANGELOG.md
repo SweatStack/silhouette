@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+
+- `duration_range` parameter on all parametric models to restrict which data points are used for fitting. Exposes `duration_mask_` fitted attribute.
+- Recommended duration range warnings: `TwoParameterRegressor` warns when data falls outside 2-15 minutes, `ThreeParameterRegressor` warns for data above 15 minutes.
+
 ## [0.4.0] - 2026-03-17
 
 ### Added
