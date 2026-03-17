@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Silhouette - Intensity-duration modelling toolkit</title>
+    <script src="mini-coi.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script>
+        window.ANALYSIS_SCRIPT = 'main.py';
+    </script>
+    <script src="js/app.js"></script>
+    <style>
+        body { background: #fff; }
+        .app-container { max-width: 64rem; margin: 0 auto; }
+        .tagline { font-size: 0.85rem; color: #6b7280; margin: 0; }
+        .tagline a { color: #6b7280; }
+
+        .app-layout {
+            display: grid;
+            grid-template-columns: 1fr 260px;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .chart-area { display: flex; flex-direction: column; }
+
+        .chart-wrap {
+            position: relative;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .chart-wrap canvas {
+            display: block;
+            width: 100%;
+            height: 420px;
+            cursor: crosshair;
+        }
+
+        .data-points-card { margin-top: 1rem; }
+
+        .code-cta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            background: #f0f7ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 0.65rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .code-cta:hover { background: #dbeafe; border-color: #93c5fd; }
+        .code-cta span { flex: 1; }
+        .code-cta-arrow { opacity: 0.5; transition: opacity 0.15s, transform 0.15s; }
+        .code-cta:hover .code-cta-arrow { opacity: 1; transform: translateX(2px); }
+
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .panel-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+        }
+
+        .panel-card h3 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin: 0 0 0.5rem;
+        }
+
+        /* Data table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .data-table th { text-align: left; color: #9ca3af; font-weight: 500; padding: 0.25rem 0.5rem; border-bottom: 1px solid #f3f4f6; }
+        .data-table td { padding: 0.25rem 0.5rem; font-variant-numeric: tabular-nums; }
+        .data-table tr:hover { background: #f9fafb; }
+        .data-table .actions { opacity: 0; transition: opacity 0.1s; }
+        .data-table tr:hover .actions { opacity: 1; }
+
+        .btn-tiny {
+            background: none; border: none; color: #9ca3af; font-size: 0.75rem;
+            padding: 0.125rem 0.25rem; cursor: pointer; border-radius: 3px;
+        }
+        .btn-tiny:hover { color: #ef4444; background: #fef2f2; }
+
+        .add-point-btn {
+            width: 100%; background: none; border: 1px dashed #d1d5db;
+            border-radius: 4px; padding: 0.35rem; color: #9ca3af;
+            font-size: 0.8rem; cursor: pointer; margin-top: 0.5rem;
+        }
+        .add-point-btn:hover { border-color: #9ca3af; color: #6b7280; }
+
+        .empty-hint { color: #9ca3af; font-size: 0.8rem; text-align: center; padding: 0.5rem 0; }
+
+        /* Model entries */
+        .model-entry { padding: 0.5rem 0; }
+        .model-entry + .model-entry { border-top: 1px solid #f3f4f6; }
+        .model-header {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+        .model-header input[type="checkbox"] { accent-color: var(--model-color); }
+        .model-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+        .model-label { flex: 1; font-weight: 500; }
+
+        .model-hint {
+            font-size: 0.75rem; color: #9ca3af;
+            margin: 0.25rem 0 0 1.55rem;
+        }
+        .model-hint-need { color: #d97706; }
+
+        .model-params {
+            margin: 0.35rem 0 0 1.55rem;
+        }
+        .param-item {
+            display: flex; justify-content: space-between;
+            font-size: 0.8rem; padding: 0.1rem 0; color: #374151;
+        }
+        .param-name { color: #6b7280; }
+        .param-value { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+        /* Point dialog */
+        .point-dialog {
+            position: fixed; z-index: 500;
+            background: white; border: 1px solid #d1d5db;
+            border-radius: 8px; padding: 1rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            width: 220px; display: none;
+        }
+        .point-dialog.visible { display: block; }
+        .point-dialog h4 { margin: 0 0 0.75rem; font-size: 0.85rem; }
+        .dlg-field { margin-bottom: 0.5rem; }
+        .dlg-field label { display: block; font-size: 0.75rem; color: #6b7280; margin-bottom: 0.2rem; }
+        .dlg-row { display: flex; align-items: center; gap: 0.25rem; }
+        .dlg-field input {
+            width: 100%; padding: 0.35rem 0.5rem; border: 1px solid #d1d5db;
+            border-radius: 4px; font-size: 0.85rem; font-variant-numeric: tabular-nums;
+        }
+        .dlg-field input:focus { outline: none; border-color: #2563eb; }
+        .dlg-field .unit { font-size: 0.75rem; color: #9ca3af; flex-shrink: 0; }
+        .dlg-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .dlg-actions button { flex: 1; }
+        .btn-sm { padding: 0.35rem 0.5rem; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; }
+        .btn-save { background: #1f2937; color: white; }
+        .btn-save:hover { background: #111827; }
+        .btn-delete { background: #fef2f2; color: #ef4444; }
+        .btn-delete:hover { background: #fee2e2; }
+        .btn-cancel { background: #f3f4f6; color: #6b7280; }
+        .btn-cancel:hover { background: #e5e7eb; }
+
+        /* Custom code modal */
+        .code-modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 1000;
+            padding: 1rem; overflow-y: auto;
+        }
+        .code-modal.visible {
+            display: flex; justify-content: center; align-items: flex-start;
+        }
+        .code-modal-content {
+            background: white; border-radius: 8px;
+            width: 100%; max-width: 52rem; margin: 2rem 0;
+            overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .code-modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 1rem; border-bottom: 1px solid #eee; background: #fafafa;
+        }
+        .code-modal-title { font-family: var(--mono); font-size: 0.875rem; color: #666; }
+        .code-pane-custom { position: relative; }
+        .code-pane-custom pre {
+            margin: 0; max-height: 70vh; overflow: auto;
+        }
+        .code-pane-custom pre code {
+            display: block; font-size: 13px; line-height: 1.6; padding: 1rem;
+        }
+        .code-pane-custom .copy-btn {
+            position: absolute; top: 0.5rem; right: 0.5rem;
+            width: 1.75rem; height: 1.75rem; border: 1px solid #eee;
+            background: white; color: #666; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 1;
+        }
+        .code-pane-custom .copy-btn:hover { background: #f5f5f5; color: #333; }
+        .code-pane-custom .copy-btn svg { width: 14px; height: 14px; }
+
+        /* Override framework defaults for this demo */
+        #auth { display: none !important; }
+        #app { display: block !important; max-width: none; }
+        .output-panel { display: none !important; }
+
+        footer.app-footer {
+            max-width: 64rem; margin: 3rem auto 0;
+            padding-top: 2rem; border-top: 1px solid #eee;
+            color: #666; font-size: 0.875rem; text-align: center;
+        }
+        footer.app-footer a { color: #666; }
+
+        @media (max-width: 720px) {
+            .app-layout { grid-template-columns: 1fr; }
+            .chart-wrap canvas { height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Framework expects these elements -->
+    <div id="auth"></div>
+
+    <div id="app">
+        <div class="app-container">
+            <div class="header">
+                <div>
+                    <h1>Silhouette</h1>
+                    <p class="tagline">The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible. <a href="https://github.com/sweatstack/silhouette" target="_blank">GitHub</a></p>
+                </div>
+                <div class="header-actions">
+                    <button id="status" class="status hidden" onclick="InfoModal.show()"><span class="dot"></span><span class="label"></span></button>
+                </div>
+            </div>
+
+            <div class="app-layout">
+                <div class="chart-area">
+                    <div class="chart-wrap">
+                        <canvas id="chart"></canvas>
+                    </div>
+                    <div class="panel-card data-points-card">
+                        <h3>Data Points</h3>
+                        <div id="data-table-wrap"></div>
+                        <button class="add-point-btn" onclick="openAddDialog()">+ Add point</button>
+                    </div>
+                </div>
+
+                <div class="side-panel">
+                    <button class="code-cta" onclick="showCodeModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        <span>Get the Python code</span>
+                        <svg class="code-cta-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                    <div class="panel-card">
+                        <h3>Models</h3>
+                        <div id="model-toggles"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Point add/edit dialog -->
+    <div id="point-dialog" class="point-dialog">
+        <h4 id="dlg-title">Add Point</h4>
+        <div class="dlg-field">
+            <label>Duration</label>
+            <div class="dlg-row">
+                <input type="number" id="dlg-min" min="0" step="1" placeholder="0" style="width:45%">
+                <span class="unit">m</span>
+                <input type="number" id="dlg-sec" min="0" max="59" step="1" placeholder="0" style="width:45%">
+                <span class="unit">s</span>
+            </div>
+        </div>
+        <div class="dlg-field">
+            <label>Power</label>
+            <div class="dlg-row">
+                <input type="number" id="dlg-power" min="0" step="1" placeholder="0">
+                <span class="unit">W</span>
+            </div>
+        </div>
+        <div class="dlg-actions">
+            <button class="btn-sm btn-save" onclick="saveDialog()">Save</button>
+            <button class="btn-sm btn-delete" id="dlg-delete-btn" onclick="deleteFromDialog()" style="display:none">Delete</button>
+            <button class="btn-sm btn-cancel" onclick="closeDialog()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Custom code modal -->
+    <div id="custom-code-modal" class="code-modal">
+        <div class="code-modal-content">
+            <div class="code-modal-header">
+                <span class="code-modal-title">Python code &mdash; <a href="https://github.com/aart/silhouette#installation" style="color: #2563eb; text-decoration: none;" target="_blank">installation instructions</a></span>
+                <button class="modal-close" onclick="hideCodeModal()">&times;</button>
+            </div>
+            <div class="code-pane-custom">
+                <button class="copy-btn" onclick="copyCode()" title="Copy to clipboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                <pre><code id="generated-code" class="language-python"></code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Framework info modal -->
+    <div id="info-modal" class="modal">
+        <div class="modal-content modal-content-sm">
+            <div class="modal-header">
+                <span id="info-status" class="status"><span class="dot"></span><span class="label"></span></span>
+                <button class="modal-close" onclick="InfoModal.hide()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><b>silhouette</b> is an intensity-duration modelling toolkit for endurance sports. This interactive demo fits power-duration models to your data directly in the browser.</p>
+                <p>Models run in Python via <a href="https://pyodide.org">Pyodide</a> (WebAssembly). First load may take up to a minute while packages install.</p>
+                <p><a href="https://github.com/aart/silhouette">View on GitHub</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden elements the framework needs -->
+    <div class="output-panel"><div id="output-status"></div><div id="output"></div></div>
+    <div id="code-modal" class="modal"><div class="modal-content"><div class="modal-header"><span class="modal-title"></span><button class="modal-close" onclick="CodeModal.hide()">&times;</button></div><div class="code-pane"><button class="modal-copy">&nbsp;</button><pre id="code-view"><code class="language-python"></code></pre></div></div></div>
+
+    <footer class="app-footer">
+        <a href="https://github.com/aart/silhouette">silhouette</a> &mdash; scikit-learn compatible power-duration models for cycling and endurance sports
+    </footer>
+
+    <script>
+    // =========================================================================
+    // State
+    // =========================================================================
+
+    const STATE = {
+        points: [],           // [{duration, power}, ...]
+        curves: {},           // {modelName: {params, curve: {t, p}}}
+        modelVisible: { two_parameter: true, three_parameter: true, omni: true },
+        dialogMode: null,     // 'add' | 'edit'
+        dialogIndex: -1,      // index of point being edited
+        dragging: null,       // {index, startX, startY, origDuration, origPower}
+        hasDragged: false,
+        pythonReady: false,
+    };
+
+    const MODEL_META = {
+        two_parameter:   { label: '2-Parameter',   color: '#2563eb', min: 2, paramNames: ['cp', 'w_prime'] },
+        three_parameter: { label: '3-Parameter',   color: '#ea580c', min: 3, paramNames: ['cp', 'w_prime', 'p_max'] },
+        omni:            { label: 'Omni-Duration',  color: '#16a34a', min: 5, paramNames: ['cp', 'p_max', 'w_prime', 'a', 'tcp_max'] },
+    };
+
+    const PARAM_LABELS = {
+        cp: ['CP', 'W'], w_prime: ["W'", 'J'], p_max: ['Pmax', 'W'],
+        a: ['a', ''], tcp_max: ['tcp_max', 's'],
+    };
+
+    // =========================================================================
+    // Chart
+    // =========================================================================
+
+    const canvas = document.getElementById('chart');
+    const ctx = canvas.getContext('2d');
+    const margin = { top: 24, right: 24, bottom: 48, left: 64 };
+
+    let W, H, dpr;  // logical size and device pixel ratio
+
+    const X_RANGE = [1, 7200];
+    let yMax = 1500;
+
+    const X_TICKS = [1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200];
+    const X_LABELS = ['1s','2s','5s','10s','20s','30s','1m','2m','5m','10m','20m','30m','1h','2h'];
+
+    function toX(duration) {
+        const logMin = Math.log10(X_RANGE[0]), logMax = Math.log10(X_RANGE[1]);
+        const plotW = W - margin.left - margin.right;
+        return margin.left + (Math.log10(duration) - logMin) / (logMax - logMin) * plotW;
+    }
+
+    function toY(power) {
+        const plotH = H - margin.top - margin.bottom;
+        return margin.top + (1 - power / yMax) * plotH;
+    }
+
+    function fromX(x) {
+        const logMin = Math.log10(X_RANGE[0]), logMax = Math.log10(X_RANGE[1]);
+        const plotW = W - margin.left - margin.right;
+        const ratio = (x - margin.left) / plotW;
+        return Math.pow(10, logMin + ratio * (logMax - logMin));
+    }
+
+    function fromY(y) {
+        const plotH = H - margin.top - margin.bottom;
+        return yMax * (1 - (y - margin.top) / plotH);
+    }
+
+    function resizeCanvas() {
+        dpr = window.devicePixelRatio || 1;
+        // Use the parent's width but a fixed CSS height for the canvas
+        const parentW = canvas.parentElement.clientWidth;
+        const cssH = 420;
+        W = parentW;
+        H = cssH;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        draw();
+    }
+
+    function updateYRange() {
+        let maxP = 0;
+        STATE.points.forEach(p => { if (p.power > maxP) maxP = p.power; });
+        yMax = Math.max(1500, Math.ceil(maxP * 1.2 / 100) * 100);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        const pL = margin.left, pR = W - margin.right;
+        const pT = margin.top, pB = H - margin.bottom;
+
+        // Plot background
+        ctx.fillStyle = '#fafafa';
+        ctx.fillRect(pL, pT, pR - pL, pB - pT);
+
+        // Grid
+        ctx.strokeStyle = '#f0f0f0';
+        ctx.lineWidth = 1;
+        ctx.font = '11px system-ui, sans-serif';
+
+        // X grid + labels
+        ctx.textAlign = 'center';
+        X_TICKS.forEach((t, i) => {
+            if (t < X_RANGE[0] || t > X_RANGE[1]) return;
+            const x = Math.round(toX(t)) + 0.5;
+            ctx.beginPath(); ctx.moveTo(x, pT); ctx.lineTo(x, pB); ctx.stroke();
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillText(X_LABELS[i], x, pB + 16);
+        });
+
+        // Y grid + labels
+        const yStep = yMax <= 500 ? 50 : yMax <= 1000 ? 100 : 200;
+        ctx.textAlign = 'right';
+        for (let p = 0; p <= yMax; p += yStep) {
+            const y = Math.round(toY(p)) + 0.5;
+            ctx.beginPath(); ctx.moveTo(pL, y); ctx.lineTo(pR, y); ctx.stroke();
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillText(p + '', pL - 8, y + 4);
+        }
+
+        // Axes
+        ctx.strokeStyle = '#d1d5db';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pL, pT); ctx.lineTo(pL, pB); ctx.lineTo(pR, pB); ctx.stroke();
+
+        // Axis labels
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '12px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Duration', (pL + pR) / 2, pB + 36);
+        ctx.save();
+        ctx.translate(16, (pT + pB) / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Power (W)', 0, 0);
+        ctx.restore();
+
+        // Curves (clipped to plot area)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pL, pT, pR - pL, pB - pT);
+        ctx.clip();
+
+        for (const [name, data] of Object.entries(STATE.curves)) {
+            if (!STATE.modelVisible[name] || !data.curve) continue;
+            const { t, p } = data.curve;
+            ctx.strokeStyle = MODEL_META[name].color;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i < t.length; i++) {
+                const x = toX(t[i]), y = toY(p[i]);
+                if (!started) { ctx.moveTo(x, y); started = true; }
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        ctx.restore();
+
+        // Points
+        STATE.points.forEach((pt, i) => {
+            const x = toX(pt.duration), y = toY(pt.power);
+            if (x < pL || x > pR || y < pT || y > pB) return;
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = (STATE.dialogMode === 'edit' && STATE.dialogIndex === i) ? '#ef4444' : '#1f2937';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+
+        // Empty state hint
+        if (STATE.points.length === 0 && STATE.pythonReady) {
+            ctx.fillStyle = '#9ca3af';
+            ctx.font = '14px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Click anywhere on the chart to add a data point', W / 2, H / 2);
+        }
+
+        // Loading overlay
+        if (!STATE.pythonReady) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fillRect(pL, pT, pR - pL, pB - pT);
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '14px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Loading Python\u2026', (pL + pR) / 2, (pT + pB) / 2);
+        }
+    }
+
+    // =========================================================================
+    // Canvas interaction
+    // =========================================================================
+
+    function getCanvasPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function hitTest(pos) {
+        for (let i = STATE.points.length - 1; i >= 0; i--) {
+            const pt = STATE.points[i];
+            const dx = toX(pt.duration) - pos.x, dy = toY(pt.power) - pos.y;
+            if (dx * dx + dy * dy < 100) return i;  // 10px radius
+        }
+        return -1;
+    }
+
+    function inPlotArea(pos) {
+        return pos.x >= margin.left && pos.x <= W - margin.right
+            && pos.y >= margin.top && pos.y <= H - margin.bottom;
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        const pos = getCanvasPos(e);
+        if (!inPlotArea(pos)) return;
+
+        const idx = hitTest(pos);
+        if (idx >= 0) {
+            STATE.dragging = {
+                index: idx,
+                startX: e.clientX, startY: e.clientY,
+                origDuration: STATE.points[idx].duration,
+                origPower: STATE.points[idx].power,
+            };
+            STATE.hasDragged = false;
+            e.preventDefault();
+        }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        const pos = getCanvasPos(e);
+
+        if (STATE.dragging) {
+            const dx = e.clientX - STATE.dragging.startX;
+            const dy = e.clientY - STATE.dragging.startY;
+            if (Math.abs(dx) + Math.abs(dy) > 4) STATE.hasDragged = true;
+
+            if (STATE.hasDragged && inPlotArea(pos)) {
+                const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
+                const pow = Math.max(0, Math.min(yMax, fromY(pos.y)));
+                STATE.points[STATE.dragging.index].duration = Math.round(dur);
+                STATE.points[STATE.dragging.index].power = Math.round(pow);
+                draw();
+            }
+            return;
+        }
+
+        // Cursor style
+        if (inPlotArea(pos) && hitTest(pos) >= 0) {
+            canvas.style.cursor = 'grab';
+        } else if (inPlotArea(pos)) {
+            canvas.style.cursor = 'crosshair';
+        } else {
+            canvas.style.cursor = 'default';
+        }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (STATE.dragging) {
+            const wasDrag = STATE.hasDragged;
+            const idx = STATE.dragging.index;
+            STATE.dragging = null;
+
+            if (wasDrag) {
+                onPointsChanged();
+                return;
+            }
+
+            // Click on point → edit dialog
+            openEditDialog(idx, e.clientX, e.clientY);
+            return;
+        }
+
+        const pos = getCanvasPos(e);
+        if (!inPlotArea(pos)) return;
+        if (hitTest(pos) >= 0) return;
+
+        // Click on empty area → add dialog
+        const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
+        const pow = Math.max(0, Math.min(yMax, fromY(pos.y)));
+        openAddDialogAt(Math.round(dur), Math.round(pow), e.clientX, e.clientY);
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const pos = getCanvasPos(touch);
+        if (!inPlotArea(pos)) return;
+
+        const idx = hitTest(pos);
+        if (idx >= 0) {
+            STATE.dragging = {
+                index: idx,
+                startX: touch.clientX, startY: touch.clientY,
+                origDuration: STATE.points[idx].duration,
+                origPower: STATE.points[idx].power,
+            };
+            STATE.hasDragged = false;
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (!STATE.dragging) return;
+        const touch = e.touches[0];
+        const pos = getCanvasPos(touch);
+        const dx = touch.clientX - STATE.dragging.startX;
+        const dy = touch.clientY - STATE.dragging.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 4) STATE.hasDragged = true;
+
+        if (STATE.hasDragged && inPlotArea(pos)) {
+            const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
+            const pow = Math.max(0, Math.min(yMax, fromY(pos.y)));
+            STATE.points[STATE.dragging.index].duration = Math.round(dur);
+            STATE.points[STATE.dragging.index].power = Math.round(pow);
+            draw();
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        if (!STATE.dragging) return;
+        const wasDrag = STATE.hasDragged;
+        const idx = STATE.dragging.index;
+        STATE.dragging = null;
+
+        if (wasDrag) {
+            onPointsChanged();
+            return;
+        }
+
+        const touch = e.changedTouches[0];
+        openEditDialog(idx, touch.clientX, touch.clientY);
+    });
+
+    // =========================================================================
+    // Dialog
+    // =========================================================================
+
+    const dlg = document.getElementById('point-dialog');
+
+    function positionDialog(clientX, clientY) {
+        const dw = 220, dh = 200;
+        let left = clientX + 12, top = clientY - 20;
+        if (left + dw > window.innerWidth - 8) left = clientX - dw - 12;
+        if (top + dh > window.innerHeight - 8) top = window.innerHeight - dh - 8;
+        if (top < 8) top = 8;
+        dlg.style.left = left + 'px';
+        dlg.style.top = top + 'px';
+    }
+
+    function openAddDialogAt(dur, pow, clientX, clientY) {
+        closeDialog();
+        STATE.dialogMode = 'add';
+        STATE.dialogIndex = -1;
+        document.getElementById('dlg-title').textContent = 'Add Point';
+        document.getElementById('dlg-delete-btn').style.display = 'none';
+        document.getElementById('dlg-min').value = Math.floor(dur / 60);
+        document.getElementById('dlg-sec').value = dur % 60;
+        document.getElementById('dlg-power').value = pow;
+        positionDialog(clientX, clientY);
+        dlg.classList.add('visible');
+        document.getElementById('dlg-power').select();
+    }
+
+    function openAddDialog() {
+        // From the side panel button — center dialog
+        const rect = canvas.getBoundingClientRect();
+        openAddDialogAt(300, 300, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
+
+    function openEditDialog(index, clientX, clientY) {
+        closeDialog();
+        STATE.dialogMode = 'edit';
+        STATE.dialogIndex = index;
+        const pt = STATE.points[index];
+        document.getElementById('dlg-title').textContent = 'Edit Point';
+        document.getElementById('dlg-delete-btn').style.display = '';
+        document.getElementById('dlg-min').value = Math.floor(pt.duration / 60);
+        document.getElementById('dlg-sec').value = pt.duration % 60;
+        document.getElementById('dlg-power').value = pt.power;
+        positionDialog(clientX, clientY);
+        dlg.classList.add('visible');
+        draw();
+    }
+
+    function saveDialog() {
+        const min = parseInt(document.getElementById('dlg-min').value) || 0;
+        const sec = parseInt(document.getElementById('dlg-sec').value) || 0;
+        const dur = Math.max(1, min * 60 + sec);
+        const pow = Math.max(1, parseInt(document.getElementById('dlg-power').value) || 0);
+
+        if (STATE.dialogMode === 'add') {
+            STATE.points.push({ duration: dur, power: pow });
+        } else if (STATE.dialogMode === 'edit' && STATE.dialogIndex >= 0) {
+            STATE.points[STATE.dialogIndex] = { duration: dur, power: pow };
+        }
+
+        closeDialog();
+        onPointsChanged();
+    }
+
+    function deleteFromDialog() {
+        if (STATE.dialogMode === 'edit' && STATE.dialogIndex >= 0) {
+            STATE.points.splice(STATE.dialogIndex, 1);
+        }
+        closeDialog();
+        onPointsChanged();
+    }
+
+    function closeDialog() {
+        dlg.classList.remove('visible');
+        STATE.dialogMode = null;
+        STATE.dialogIndex = -1;
+        draw();
+    }
+
+    // Close dialog on outside click
+    document.addEventListener('mousedown', (e) => {
+        if (dlg.classList.contains('visible') && !dlg.contains(e.target) && e.target !== canvas) {
+            closeDialog();
+        }
+    });
+
+    // Enter to save in dialog
+    dlg.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveDialog();
+        if (e.key === 'Escape') closeDialog();
+    });
+
+    // =========================================================================
+    // Data table
+    // =========================================================================
+
+    function formatDuration(s) {
+        if (s < 60) return s + 's';
+        const m = Math.floor(s / 60), rest = s % 60;
+        if (m < 60) return rest ? m + 'm ' + rest + 's' : m + 'm';
+        const h = Math.floor(m / 60), rm = m % 60;
+        return rm ? h + 'h ' + rm + 'm' : h + 'h';
+    }
+
+    function renderTable() {
+        const wrap = document.getElementById('data-table-wrap');
+        if (STATE.points.length === 0) {
+            wrap.innerHTML = '<div class="empty-hint">No data points yet</div>';
+            return;
+        }
+
+        // Sort display by duration
+        const sorted = STATE.points.map((p, i) => ({ ...p, i })).sort((a, b) => a.duration - b.duration);
+
+        let html = '<table class="data-table"><thead><tr><th>Duration</th><th>Power</th><th></th></tr></thead><tbody>';
+        sorted.forEach(({ duration, power, i }) => {
+            html += `<tr>
+                <td>${formatDuration(duration)}</td>
+                <td>${power}W</td>
+                <td class="actions">
+                    <button class="btn-tiny" onclick="removePoint(${i})" title="Delete">&times;</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    }
+
+    function removePoint(index) {
+        STATE.points.splice(index, 1);
+        onPointsChanged();
+    }
+
+    // =========================================================================
+    // Models panel (toggles + inline params)
+    // =========================================================================
+
+    function renderModels() {
+        const el = document.getElementById('model-toggles');
+        const n = STATE.points.length;
+        let html = '';
+
+        for (const [name, meta] of Object.entries(MODEL_META)) {
+            const enough = n >= meta.min;
+            const checked = STATE.modelVisible[name] ? 'checked' : '';
+            const curveData = STATE.curves[name];
+            const hasFit = curveData && curveData.params;
+
+            html += `<div class="model-entry" style="--model-color: ${meta.color}; ${enough ? '' : 'opacity: 0.55'}">
+                <div class="model-header">
+                    <input type="checkbox" ${checked} ${enough ? '' : 'disabled'}
+                        onchange="STATE.modelVisible['${name}']=this.checked; draw()">
+                    <span class="model-swatch" style="background: ${meta.color}"></span>
+                    <span class="model-label">${meta.label}</span>
+                </div>`;
+
+            if (!enough) {
+                const need = meta.min - n;
+                html += `<div class="model-hint model-hint-need">Add ${need} more point${need > 1 ? 's' : ''} to fit (needs ${meta.min})</div>`;
+            } else if (hasFit) {
+                html += '<div class="model-params">';
+                for (const [key, val] of Object.entries(curveData.params)) {
+                    const [label, unit] = PARAM_LABELS[key] || [key, ''];
+                    let display;
+                    if (key === 'w_prime') display = val >= 1000 ? (val / 1000).toFixed(1) + ' kJ' : val.toFixed(0) + ' J';
+                    else if (key === 'tcp_max') display = formatDuration(Math.round(val));
+                    else display = val.toFixed(0) + (unit ? ' ' + unit : '');
+                    html += `<div class="param-item"><span class="param-name">${label}</span><span class="param-value">${display}</span></div>`;
+                }
+                html += '</div>';
+            } else if (curveData && curveData.error) {
+                html += `<div class="model-hint" style="color: #ef4444">Fit failed</div>`;
+            }
+
+            html += '</div>';
+        }
+
+        el.innerHTML = html;
+    }
+
+    // =========================================================================
+    // Fitting (Python bridge)
+    // =========================================================================
+
+    let fitPending = false;
+    let fitTimer = null;
+
+    function requestFit() {
+        clearTimeout(fitTimer);
+
+        if (STATE.points.length < 2) {
+            STATE.curves = {};
+            renderModels();
+            draw();
+            return;
+        }
+
+        fitTimer = setTimeout(() => {
+            const data = JSON.stringify({
+                durations: STATE.points.map(p => p.duration),
+                powers: STATE.points.map(p => p.power),
+            });
+            fitPending = true;
+            Analysis.run(data);
+        }, 250);
+    }
+
+    window.onFitResults = function(jsonStr) {
+        fitPending = false;
+        try {
+            STATE.curves = JSON.parse(jsonStr);
+        } catch (e) {
+            console.error('Fit results parse error:', e);
+            STATE.curves = {};
+        }
+        updateYRange();
+        renderModels();
+        draw();
+    };
+
+    // =========================================================================
+    // Points changed — update everything
+    // =========================================================================
+
+    function onPointsChanged() {
+        // Sort by duration for consistent display
+        STATE.points.sort((a, b) => a.duration - b.duration);
+        updateYRange();
+        renderTable();
+        renderModels();
+        draw();
+        requestFit();
+        persistPoints();
+    }
+
+    // =========================================================================
+    // Persistence (localStorage)
+    // =========================================================================
+
+    function persistPoints() {
+        try {
+            localStorage.setItem('silhouette_demo_points', JSON.stringify(STATE.points));
+        } catch (e) { /* ignore */ }
+    }
+
+    function loadPoints() {
+        try {
+            const saved = localStorage.getItem('silhouette_demo_points');
+            if (saved) {
+                STATE.points = JSON.parse(saved);
+                return STATE.points.length > 0;
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
+    // =========================================================================
+    // Code modal
+    // =========================================================================
+
+    function generateCode() {
+        const pts = STATE.points.slice().sort((a, b) => a.duration - b.duration);
+
+        if (pts.length === 0) {
+            return `import numpy as np
+from silhouette import (
+    TwoParameterRegressor,
+    ThreeParameterRegressor,
+    OmniDurationRegressor,
+)
+from silhouette.plotting import PowerDurationDisplay
+
+# Add data points to the chart, then view this code again.
+# Example:
+durations = np.array([5, 60, 300, 600, 1200, 3600])
+powers = np.array([950, 450, 350, 320, 290, 250])
+
+X = durations.reshape(-1, 1)
+
+reg = TwoParameterRegressor()
+reg.fit(X, powers)
+print(f"CP = {reg.cp_:.0f} W")
+print(f"W' = {reg.w_prime_:.0f} J")
+
+PowerDurationDisplay.from_estimator(reg, X, powers)`;
+        }
+
+        const durStr = pts.map(p => p.duration).join(', ');
+        const powStr = pts.map(p => p.power).join(', ');
+
+        const models = [];
+        const names = [];
+        if (pts.length >= 2) { models.push('two_param'); names.push('2-Parameter'); }
+        if (pts.length >= 3) { models.push('three_param'); names.push('3-Parameter'); }
+        if (pts.length >= 5) { models.push('omni'); names.push('Omni-Duration'); }
+
+        let code = `import numpy as np
+from silhouette import (
+    TwoParameterRegressor,
+    ThreeParameterRegressor,
+    OmniDurationRegressor,
+)
+from silhouette.plotting import PowerDurationDisplay
+
+# Data
+durations = np.array([${durStr}])  # seconds
+powers = np.array([${powStr}])      # watts
+
+X = durations.reshape(-1, 1)
+`;
+
+        if (pts.length >= 2) {
+            code += `
+# Two-parameter model: P(t) = cp + w' / t
+two_param = TwoParameterRegressor()
+two_param.fit(X, powers)
+print(f"CP = {two_param.cp_:.0f} W, W' = {two_param.w_prime_:.0f} J")
+`;
+        }
+
+        if (pts.length >= 3) {
+            code += `
+# Three-parameter model (adds Pmax)
+three_param = ThreeParameterRegressor()
+three_param.fit(X, powers)
+print(f"CP = {three_param.cp_:.0f} W, W' = {three_param.w_prime_:.0f} J, Pmax = {three_param.p_max_:.0f} W")
+`;
+        }
+
+        if (pts.length >= 5) {
+            code += `
+# Omni-duration model (full power-duration relationship)
+omni = OmniDurationRegressor()
+omni.fit(X, powers)
+print(f"CP = {omni.cp_:.0f} W, W' = {omni.w_prime_:.0f} J, Pmax = {omni.p_max_:.0f} W")
+`;
+        }
+
+        // Plot
+        if (models.length === 1) {
+            code += `
+# Plot
+PowerDurationDisplay.from_estimator(${models[0]}, X, powers)
+`;
+        } else {
+            code += `
+# Plot
+PowerDurationDisplay.from_estimators(
+    [${models.join(', ')}], X, powers,
+    names=[${names.map(n => `"${n}"`).join(', ')}],
+)
+`;
+        }
+
+        return code;
+    }
+
+    function showCodeModal() {
+        const codeEl = document.getElementById('generated-code');
+        codeEl.textContent = generateCode();
+        codeEl.removeAttribute('data-highlighted');
+        hljs.highlightElement(codeEl);
+        document.getElementById('custom-code-modal').classList.add('visible');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideCodeModal() {
+        document.getElementById('custom-code-modal').classList.remove('visible');
+        document.body.style.overflow = '';
+    }
+
+    function copyCode() {
+        navigator.clipboard.writeText(generateCode()).then(() => {
+            const btn = document.querySelector('.code-pane-custom .copy-btn');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+            setTimeout(() => {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+            }, 1500);
+        });
+    }
+
+    // Close code modal on backdrop click or Escape
+    document.getElementById('custom-code-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('custom-code-modal')) hideCodeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            hideCodeModal();
+            closeDialog();
+        }
+    });
+
+    // =========================================================================
+    // Init — bypass framework auth, start PyScript directly
+    // =========================================================================
+
+    // Resize handling
+    const ro = new ResizeObserver(() => resizeCanvas());
+    ro.observe(canvas.parentElement);
+
+    // Track when Python is ready
+    const _origOnPythonReady = window.onPythonReady;
+    window.onPythonReady = function() {
+        STATE.pythonReady = true;
+        draw();
+        if (_origOnPythonReady) _origOnPythonReady();
+    };
+
+    // Provide CONFIG for framework (no auth needed, just pyScriptVersion)
+    const CONFIG = SweatStack.config('demo');
+
+    // Override framework init to skip auth
+    App.init = async function() {
+        // Show app UI directly
+        document.getElementById('app').classList.add('visible');
+
+        // Initialize framework components we use
+        OutputPanel.init();
+        CodeModal.init();
+        InfoModal.init();
+
+        // Load saved points
+        const hadPoints = loadPoints();
+
+        // Render initial state
+        renderTable();
+        renderModels();
+        resizeCanvas();
+
+        // Load PyScript
+        Status.set('loading', 'loading');
+        PyScript.load();
+
+        // If we have saved points, fit them once Python is ready
+        if (hadPoints) {
+            requestFit();
+        }
+    };
+
+    App.init();
+    </script>
+</body>
+</html>

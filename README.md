@@ -2,6 +2,8 @@
 
 The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible.
 
+**[Try the interactive playground 🚀](https://silhouette.sweatstack.no)**
+
 ## Models
 
 ### Parametric models
