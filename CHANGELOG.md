@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+
+- `FPCARegressor` for data-driven power-duration modelling (Puchowicz & Skiba, 2025).
+- `percentiles()` and `z_scores()` on `FPCARegressor` for population comparison.
+- Pre-fitted population model shipped with the library.
+- `fpca/` directory with training data and refitting scripts.
+- `DEVELOPMENT.md` with contributor setup and FPCA refitting instructions.
+
 ## [0.3.0] - 2026-03-17
 
 ### Added
