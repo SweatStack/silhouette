@@ -338,7 +338,7 @@
     const STATE = {
         points: [],           // [{duration, power}, ...]
         curves: {},           // {modelName: {params, curve: {t, p}}}
-        modelVisible: { two_parameter: true, two_parameter_work: true, three_parameter: true, omni: true },
+        modelVisible: { two_parameter: true, two_parameter_work: false, three_parameter: false, exponential: false, omni: true, minimal_power: false },
         dialogMode: null,     // 'add' | 'edit'
         dialogIndex: -1,      // index of point being edited
         dragging: null,       // {index, startX, startY, origDuration, origPower}
@@ -350,15 +350,18 @@
     };
 
     const MODEL_META = {
-        two_parameter:      { label: '2-Parameter',              desc: 'P = CP + W\u2032/t, fitted in power space',                           color: '#2563eb', min: 2, paramNames: ['cp', 'w_prime'] },
+        two_parameter:      { label: '2-Parameter',                 desc: 'P = CP + W\u2032/t, fitted in power space',                           color: '#2563eb', min: 2, paramNames: ['cp', 'w_prime'] },
         two_parameter_work: { label: '2-Parameter (work-duration)', desc: 'Same model, fitted in work space. Weights longer efforts more.', color: '#7c3aed', min: 2, paramNames: ['cp', 'w_prime'] },
-        three_parameter:    { label: '3-Parameter',              desc: 'Adds peak power (Pmax) to bound short durations',                    color: '#ea580c', min: 3, paramNames: ['cp', 'w_prime', 'p_max'] },
-        omni:               { label: 'Omni-Duration',            desc: 'Full model from sprints to multi-hour efforts',                      color: '#16a34a', min: 5, paramNames: ['cp', 'p_max', 'w_prime', 'a', 'tcp_max'] },
+        three_parameter:    { label: '3-Parameter',                 desc: 'Hyperbolic model adding Pmax to bound short durations',               color: '#ea580c', min: 3, paramNames: ['cp', 'w_prime', 'p_max'] },
+        exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Pmax toward CP (Hopkins 1989)',                color: '#0891b2', min: 3, paramNames: ['cp', 'p_max', 'tau'] },
+        omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                      color: '#16a34a', min: 5, paramNames: ['cp', 'p_max', 'w_prime', 'a', 'tcp_max'] },
+        minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAP and endurance shape (Mulligan 2018)',       color: '#db2777', min: 4, paramNames: ['map', 'map_d', 'gamma_s', 'gamma_l'] },
     };
 
     const PARAM_LABELS = {
         cp: ['CP', 'W'], w_prime: ["W'", 'J'], p_max: ['Pmax', 'W'],
-        a: ['a', ''], tcp_max: ['tcp_max', 's'],
+        a: ['a', ''], tcp_max: ['tcp_max', 's'], tau: ['\u03c4', 's'],
+        map: ['MAP', 'W'], map_d: ['MAP dur', 's'], gamma_s: ['\u03b3_s', ''], gamma_l: ['\u03b3_l', ''],
     };
 
     // =========================================================================
@@ -1046,7 +1049,8 @@
                     const [label, unit] = PARAM_LABELS[key] || [key, ''];
                     let display;
                     if (key === 'w_prime') display = val >= 1000 ? (val / 1000).toFixed(1) + ' kJ' : val.toFixed(0) + ' J';
-                    else if (key === 'tcp_max') display = formatDuration(Math.round(val));
+                    else if (key === 'tcp_max' || key === 'map_d') display = formatDuration(Math.round(val));
+                    else if (key === 'gamma_s' || key === 'gamma_l') display = val.toFixed(2);
                     else display = val.toFixed(0) + (unit ? ' ' + unit : '');
                     html += `<div class="param-item"><span class="param-name">${label}</span><span class="param-value">${display}</span></div>`;
                 }
@@ -1149,7 +1153,9 @@
 from silhouette import (
     TwoParamCriticalPowerRegressor,
     ThreeParamCriticalPowerRegressor,
+    ExpPowerRegressor,
     OmniDomainPowerRegressor,
+    MinimalPowerPowerRegressor,
 )
 from silhouette.plotting import PowerDurationDisplay
 
@@ -1171,18 +1177,26 @@ PowerDurationDisplay.from_estimator(reg, X, powers)`;
         const durStr = pts.map(p => p.duration).join(', ');
         const powStr = pts.map(p => p.power).join(', ');
 
-        const models = [];
-        const names = [];
-        if (pts.length >= 2) { models.push('two_param'); names.push('2-Parameter'); }
-        if (pts.length >= 2) { models.push('two_param_work'); names.push('2-Param (work)'); }
-        if (pts.length >= 3) { models.push('three_param'); names.push('3-Parameter'); }
-        if (pts.length >= 5) { models.push('omni'); names.push('Omni-Duration'); }
+        const visibleModels = [];
+        const visibleNames = [];
+        if (pts.length >= 2 && STATE.modelVisible.two_parameter) { visibleModels.push('two_param'); visibleNames.push('2-Parameter'); }
+        if (pts.length >= 2 && STATE.modelVisible.two_parameter_work) { visibleModels.push('two_param_work'); visibleNames.push('2-Param (work)'); }
+        if (pts.length >= 3 && STATE.modelVisible.three_parameter) { visibleModels.push('three_param'); visibleNames.push('3-Parameter'); }
+        if (pts.length >= 3 && STATE.modelVisible.exponential) { visibleModels.push('exp'); visibleNames.push('Exponential'); }
+        if (pts.length >= 5 && STATE.modelVisible.omni) { visibleModels.push('omni'); visibleNames.push('Omni-Duration'); }
+        if (pts.length >= 4 && STATE.modelVisible.minimal_power) { visibleModels.push('minimal'); visibleNames.push('Minimal Power'); }
+
+        // Build imports based on what's visible
+        const imports = [];
+        if (visibleModels.includes('two_param') || visibleModels.includes('two_param_work')) imports.push('TwoParamCriticalPowerRegressor');
+        if (visibleModels.includes('three_param')) imports.push('ThreeParamCriticalPowerRegressor');
+        if (visibleModels.includes('exp')) imports.push('ExpPowerRegressor');
+        if (visibleModels.includes('omni')) imports.push('OmniDomainPowerRegressor');
+        if (visibleModels.includes('minimal')) imports.push('MinimalPowerPowerRegressor');
 
         let code = `import numpy as np
 from silhouette import (
-    TwoParamCriticalPowerRegressor,
-    ThreeParamCriticalPowerRegressor,
-    OmniDomainPowerRegressor,
+    ${imports.join(',\n    ')},
 )
 from silhouette.plotting import PowerDurationDisplay
 
@@ -1193,13 +1207,17 @@ powers = np.array([${powStr}])      # watts
 X = durations.reshape(-1, 1)
 `;
 
-        if (pts.length >= 2) {
+        if (visibleModels.includes('two_param')) {
             code += `
 # Two-parameter model: P(t) = cp + w' / t
 two_param = TwoParamCriticalPowerRegressor()
 two_param.fit(X, powers)
 print(f"CP = {two_param.cp_:.0f} W, W' = {two_param.w_prime_:.0f} J")
+`;
+        }
 
+        if (visibleModels.includes('two_param_work')) {
+            code += `
 # Two-parameter model (work-duration linearization)
 two_param_work = TwoParamCriticalPowerRegressor(fitting="work_duration")
 two_param_work.fit(X, powers)
@@ -1207,16 +1225,25 @@ print(f"CP = {two_param_work.cp_:.0f} W, W' = {two_param_work.w_prime_:.0f} J")
 `;
         }
 
-        if (pts.length >= 3) {
+        if (visibleModels.includes('three_param')) {
             code += `
-# Three-parameter model (adds Pmax)
+# Three-parameter model (hyperbolic, adds Pmax)
 three_param = ThreeParamCriticalPowerRegressor()
 three_param.fit(X, powers)
 print(f"CP = {three_param.cp_:.0f} W, W' = {three_param.w_prime_:.0f} J, Pmax = {three_param.p_max_:.0f} W")
 `;
         }
 
-        if (pts.length >= 5) {
+        if (visibleModels.includes('exp')) {
+            code += `
+# Exponential model: P(t) = (Pmax - CP) * exp(-t/tau) + CP
+exp = ExpPowerRegressor()
+exp.fit(X, powers)
+print(f"CP = {exp.cp_:.0f} W, Pmax = {exp.p_max_:.0f} W, tau = {exp.tau_:.0f} s")
+`;
+        }
+
+        if (visibleModels.includes('omni')) {
             code += `
 # Omni-duration model (full power-duration relationship)
 omni = OmniDomainPowerRegressor()
@@ -1225,18 +1252,29 @@ print(f"CP = {omni.cp_:.0f} W, W' = {omni.w_prime_:.0f} J, Pmax = {omni.p_max_:.
 `;
         }
 
+        if (visibleModels.includes('minimal')) {
+            code += `
+# Minimal power model (Lambert W, Mulligan 2018)
+minimal = MinimalPowerPowerRegressor()
+minimal.fit(X, powers)
+print(f"MAP = {minimal.map_:.0f} W, MAP dur = {minimal.map_d_:.0f} s")
+`;
+        }
+
         // Plot
-        if (models.length === 1) {
+        if (visibleModels.length === 0) {
+            // No models visible, skip plot
+        } else if (visibleModels.length === 1) {
             code += `
 # Plot
-PowerDurationDisplay.from_estimator(${models[0]}, X, powers)
+PowerDurationDisplay.from_estimator(${visibleModels[0]}, X, powers)
 `;
         } else {
             code += `
 # Plot
 PowerDurationDisplay.from_estimators(
-    [${models.join(', ')}], X, powers,
-    names=[${names.map(n => `"${n}"`).join(', ')}],
+    [${visibleModels.join(', ')}], X, powers,
+    names=[${visibleNames.map(n => `"${n}"`).join(', ')}],
 )
 `;
         }

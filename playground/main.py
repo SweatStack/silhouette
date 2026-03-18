@@ -28,14 +28,18 @@ results = {}
 from silhouette import (
     TwoParamCriticalPowerRegressor,
     ThreeParamCriticalPowerRegressor,
+    ExpPowerRegressor,
     OmniDomainPowerRegressor,
+    MinimalPowerPowerRegressor,
 )
 
 models = {
     "two_parameter": (TwoParamCriticalPowerRegressor, 2, {}),
     "two_parameter_work": (TwoParamCriticalPowerRegressor, 2, {"fitting": "work_duration"}),
     "three_parameter": (ThreeParamCriticalPowerRegressor, 3, {}),
+    "exponential": (ExpPowerRegressor, 3, {}),
     "omni": (OmniDomainPowerRegressor, 5, {}),
+    "minimal_power": (MinimalPowerPowerRegressor, 4, {}),
 }
 
 for name, (Model, min_points, kwargs) in models.items():
