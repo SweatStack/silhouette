@@ -16,6 +16,10 @@ from silhouette.minimal_power import (
     MinimalPowerPowerRegressor,
     MinimalPowerSpeedRegressor,
 )
+from silhouette.exponential import (
+    ExpPowerRegressor,
+    ExpSpeedRegressor,
+)
 from silhouette.fpca import FPCAPowerRegressor
 
 __version__ = version("silhouette")
@@ -29,5 +33,7 @@ __all__ = [
     "OmniDomainSpeedRegressor",
     "MinimalPowerPowerRegressor",
     "MinimalPowerSpeedRegressor",
+    "ExpPowerRegressor",
+    "ExpSpeedRegressor",
     "FPCAPowerRegressor",
 ]

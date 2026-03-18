@@ -13,6 +13,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 | `TwoParamCriticalPowerRegressor` | CP, W' |
 | `ThreeParamCriticalPowerRegressor` | CP, W', P_max |
 | `OmniDomainPowerRegressor` | CP, W', P_max, a, tcp_max |
+| `ExpPowerRegressor` | CP, P_max, tau |
 | `MinimalPowerPowerRegressor` ⚠️ *experimental* | MAP, MAP duration, gamma_l, gamma_s |
 | `FPCAPowerRegressor` | FPC1, FPC2, FPC3 |
 
@@ -22,6 +23,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 |---|---|
 | `TwoParamCriticalSpeedRegressor` | CS, D' |
 | `ThreeParamCriticalSpeedRegressor` | CS, D', S_max |
+| `ExpSpeedRegressor` ⚠️ *experimental* | CS, S_max, tau |
 | `OmniDomainSpeedRegressor` ⚠️ *experimental* | CS, D', S_max, a, tcp_max |
 | `MinimalPowerSpeedRegressor` | MAS, MAS duration, gamma_l, gamma_s |
 
@@ -114,6 +116,7 @@ Each model is designed for a specific duration range:
 |---|---|
 | Two-parameter | 2-15 min |
 | Three-parameter | up to 15 min |
+| Exponential | up to 15 min |
 | Omni-domain | any |
 | Minimal power | 1 min+ |
 | FPCA | any |
@@ -207,6 +210,7 @@ display = MinimalPowerDisplay.from_estimator(reg_minimal, durations.reshape(-1, 
 ## References
 
 - Monod, H., & Scherrer, J. (1965). The work capacity of a synergic muscular group. *Ergonomics, 8*(3), 329-338.
+- Hopkins, W. G., Edmond, I. M., Hamilton, B. H., Macfarlane, D. J., & Ross, B. H. (1989). Relation between power and endurance for treadmill running of short duration. *Ergonomics, 32*(12), 1565-1571.
 - Morton, R. H. (1996). A 3-parameter critical power model. *Ergonomics, 39*(4), 611-619.
 - Mulligan, M., Adam, G., & Emig, T. (2018). A minimal power model for human running performance. *PloS one, 13*(11), e0206645.
 - Puchowicz, M. J., Baker, J., & Clarke, D. C. (2020). Development and field validation of an omni-domain power-duration model. *Journal of Sports Sciences, 38*(7), 801-813.

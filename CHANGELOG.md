@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ExpPowerRegressor` and `ExpSpeedRegressor` (speed experimental) implementing the exponential power-duration model (Hopkins et al., 1989): P(t) = (P_max - CP) · exp(-t/τ) + CP.
 - `MinimalPowerPowerRegressor` and `MinimalPowerSpeedRegressor` (both experimental) implementing the Lambert W minimal power model (Mulligan et al., 2018).
 - `MinimalPowerDisplay` for normalized minimal power model plots with reference endurance band, replicating Figure 2 from Mulligan et al. (2018). Works for both power and speed regressors.
 - Speed (running) variants of all parametric models: `TwoParamCriticalSpeedRegressor`, `ThreeParamCriticalSpeedRegressor`, `OmniDomainSpeedRegressor` (experimental). Same formulas as power models with speed-appropriate parameter names (CS, D'), bounds, and defaults.
