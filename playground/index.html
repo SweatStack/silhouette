@@ -65,6 +65,28 @@
         .code-cta-arrow { opacity: 0.5; transition: opacity 0.15s, transform 0.15s; }
         .code-cta:hover .code-cta-arrow { opacity: 1; transform: translateX(2px); }
 
+        /* Domain toggle */
+        .domain-toggle {
+            display: flex;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .domain-toggle button {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: #fff;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .domain-toggle button + button { border-left: 1px solid #e5e7eb; }
+        .domain-toggle button.active { background: #1f2937; color: #fff; }
+        .domain-toggle button:not(.active):hover { background: #f9fafb; }
+
         .side-panel {
             display: flex;
             flex-direction: column;
@@ -256,6 +278,10 @@
                         <span>Get the Python code</span>
                         <svg class="code-cta-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>
                     </button>
+                    <div class="domain-toggle">
+                        <button id="domain-power" class="active" onclick="setDomain('power')">Power (cycling)</button>
+                        <button id="domain-speed" onclick="setDomain('speed')">Speed (running)</button>
+                    </div>
                     <div class="panel-card">
                         <h3>Models</h3>
                         <div id="model-toggles"></div>
@@ -278,10 +304,10 @@
             </div>
         </div>
         <div class="dlg-field">
-            <label>Power</label>
+            <label id="dlg-value-label">Power</label>
             <div class="dlg-row">
-                <input type="number" id="dlg-power" min="0" step="1" placeholder="0">
-                <span class="unit">W</span>
+                <input type="number" id="dlg-value" min="0" step="any" placeholder="0">
+                <span class="unit" id="dlg-value-unit">W</span>
             </div>
         </div>
         <div class="dlg-actions">
@@ -336,12 +362,13 @@
     // =========================================================================
 
     const STATE = {
-        points: [],           // [{duration, power}, ...]
-        curves: {},           // {modelName: {params, curve: {t, p}}}
+        domain: 'power',      // 'power' | 'speed'
+        points: [],           // [{duration, value}, ...] — value is W or m/s
+        curves: {},           // {modelName: {params, curve: {t, v}}}
         modelVisible: { two_parameter: true, two_parameter_work: false, three_parameter: false, exponential: false, omni: true, minimal_power: false },
         dialogMode: null,     // 'add' | 'edit'
         dialogIndex: -1,      // index of point being edited
-        dragging: null,       // {index, startX, startY, origDuration, origPower}
+        dragging: null,       // {index, startX, startY, origDuration, origValue}
         hasDragged: false,
         pythonReady: false,
         hover: null,          // {x, y} canvas pos or null
@@ -349,20 +376,50 @@
         zoom: null,           // {xMin, xMax, yMin, yMax} in data coords or null
     };
 
-    const MODEL_META = {
-        two_parameter:      { label: '2-Parameter',                 desc: 'P = CP + W\u2032/t, fitted in power space',                           color: '#2563eb', min: 2, paramNames: ['cp', 'w_prime'] },
-        two_parameter_work: { label: '2-Parameter (work-duration)', desc: 'Same model, fitted in work space. Weights longer efforts more.', color: '#7c3aed', min: 2, paramNames: ['cp', 'w_prime'] },
-        three_parameter:    { label: '3-Parameter',                 desc: 'Hyperbolic model adding Pmax to bound short durations',               color: '#ea580c', min: 3, paramNames: ['cp', 'w_prime', 'p_max'] },
-        exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Pmax toward CP (Hopkins 1989)',                color: '#0891b2', min: 3, paramNames: ['cp', 'p_max', 'tau'] },
-        omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                      color: '#16a34a', min: 5, paramNames: ['cp', 'p_max', 'w_prime', 'a', 'tcp_max'] },
-        minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAP and endurance shape (Mulligan 2018)',       color: '#db2777', min: 4, paramNames: ['map', 'map_d', 'gamma_s', 'gamma_l'] },
+    // Domain config
+    const DOMAIN = {
+        power: {
+            label: 'Power [W]', unit: 'W', yDefault: 1500,
+            toDisplay: v => v,           // W → W
+            fromDisplay: v => v,         // W → W
+            formatValue: v => Math.round(v) + 'W',
+            models: {
+                two_parameter:      { label: '2-Parameter',                 desc: 'P = CP + W\u2032/t, fitted in power space',                     color: '#2563eb', min: 2 },
+                two_parameter_work: { label: '2-Parameter (work-duration)', desc: 'Same model, fitted in work space. Weights longer efforts more.', color: '#7c3aed', min: 2 },
+                three_parameter:    { label: '3-Parameter',                 desc: 'Hyperbolic model adding Pmax to bound short durations',          color: '#ea580c', min: 3 },
+                exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Pmax toward CP (Hopkins 1989)',           color: '#0891b2', min: 3 },
+                omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                  color: '#16a34a', min: 5 },
+                minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAP and endurance shape (Mulligan 2018)',  color: '#db2777', min: 4 },
+            },
+            paramLabels: {
+                cp: ['CP', 'W'], w_prime: ["W'", 'J'], p_max: ['Pmax', 'W'],
+                a: ['a', ''], tcp_max: ['tcp_max', 's'], tau: ['\u03c4', 's'],
+                map: ['MAP', 'W'], map_duration: ['MAP dur', 's'], gamma_s: ['\u03b3_s', ''], gamma_l: ['\u03b3_l', ''],
+            },
+        },
+        speed: {
+            label: 'Speed [km/h]', unit: 'km/h', yDefault: 30,
+            toDisplay: v => v * 3.6,     // m/s → km/h
+            fromDisplay: v => v / 3.6,   // km/h → m/s
+            formatValue: v => (v * 3.6).toFixed(1) + ' km/h',
+            models: {
+                two_parameter:      { label: '2-Parameter',                 desc: 'v = CS + D\u2032/t, fitted in speed space',                     color: '#2563eb', min: 2 },
+                two_parameter_work: { label: '2-Parameter (dist-duration)', desc: 'Same model, fitted in distance space. Weights longer efforts more.', color: '#7c3aed', min: 2 },
+                three_parameter:    { label: '3-Parameter',                 desc: 'Hyperbolic model adding Smax to bound short durations',          color: '#ea580c', min: 3 },
+                exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Smax toward CS (Hopkins 1989)',           color: '#0891b2', min: 3 },
+                omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                  color: '#16a34a', min: 5 },
+                minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAS and endurance shape (Mulligan 2018)',  color: '#db2777', min: 4 },
+            },
+            paramLabels: {
+                cs: ['CS', 'km/h'], d_prime: ["D'", 'm'], s_max: ['Smax', 'km/h'],
+                a: ['a', ''], tcp_max: ['tcp_max', 's'], tau: ['\u03c4', 's'],
+                map: ['MAS', 'km/h'], map_duration: ['MAS dur', 's'], gamma_s: ['\u03b3_s', ''], gamma_l: ['\u03b3_l', ''],
+            },
+        },
     };
 
-    const PARAM_LABELS = {
-        cp: ['CP', 'W'], w_prime: ["W'", 'J'], p_max: ['Pmax', 'W'],
-        a: ['a', ''], tcp_max: ['tcp_max', 's'], tau: ['\u03c4', 's'],
-        map: ['MAP', 'W'], map_d: ['MAP dur', 's'], gamma_s: ['\u03b3_s', ''], gamma_l: ['\u03b3_l', ''],
-    };
+    function dom() { return DOMAIN[STATE.domain]; }
+    function modelMeta() { return dom().models; }
 
     // =========================================================================
     // Chart
@@ -375,7 +432,7 @@
     let W, H, dpr;  // logical size and device pixel ratio
 
     const X_RANGE_DEFAULT = [1, 7200];
-    let yMaxDefault = 1500;
+    let yMaxDefault = dom().yDefault;
 
     const X_TICKS = [1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200];
     const X_LABELS = ['1s','2s','5s','10s','20s','30s','1m','2m','5m','10m','20m','30m','1h','2h'];
@@ -430,9 +487,13 @@
     }
 
     function updateYRange() {
-        let maxP = 0;
-        STATE.points.forEach(p => { if (p.power > maxP) maxP = p.power; });
-        yMaxDefault = Math.max(1500, Math.ceil(maxP * 1.2 / 100) * 100);
+        let maxV = 0;
+        STATE.points.forEach(p => { const dv = dom().toDisplay(p.value); if (dv > maxV) maxV = dv; });
+        if (STATE.domain === 'power') {
+            yMaxDefault = Math.max(dom().yDefault, Math.ceil(maxV * 1.2 / 100) * 100);
+        } else {
+            yMaxDefault = Math.max(dom().yDefault, Math.ceil(maxV * 1.2 / 5) * 5);
+        }
     }
 
     function draw() {
@@ -464,14 +525,19 @@
 
         // Y grid + labels
         const ySpan = yMax - yMin;
-        const yStep = ySpan <= 200 ? 25 : ySpan <= 500 ? 50 : ySpan <= 1000 ? 100 : 200;
+        let yStep;
+        if (STATE.domain === 'speed') {
+            yStep = ySpan <= 15 ? 1 : ySpan <= 30 ? 2 : ySpan <= 60 ? 5 : 10;
+        } else {
+            yStep = ySpan <= 200 ? 25 : ySpan <= 500 ? 50 : ySpan <= 1000 ? 100 : 200;
+        }
         const yStart = Math.ceil(yMin / yStep) * yStep;
         ctx.textAlign = 'right';
         for (let p = yStart; p <= yMax; p += yStep) {
             const y = Math.round(toY(p)) + 0.5;
             ctx.beginPath(); ctx.moveTo(pL, y); ctx.lineTo(pR, y); ctx.stroke();
             ctx.fillStyle = '#9ca3af';
-            ctx.fillText(p + '', pL - 8, y + 4);
+            ctx.fillText(STATE.domain === 'speed' ? p.toFixed(0) : p + '', pL - 8, y + 4);
         }
 
         // Axes
@@ -483,11 +549,11 @@
         ctx.fillStyle = '#6b7280';
         ctx.font = '12px system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Duration', (pL + pR) / 2, pB + 36);
+        ctx.fillText('Duration [s]', (pL + pR) / 2, pB + 36);
         ctx.save();
         ctx.translate(16, (pT + pB) / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillText('Power (W)', 0, 0);
+        ctx.fillText(dom().label, 0, 0);
         ctx.restore();
 
         // Curves (clipped to plot area)
@@ -496,15 +562,16 @@
         ctx.rect(pL, pT, pR - pL, pB - pT);
         ctx.clip();
 
+        const toDisp = dom().toDisplay;
         for (const [name, data] of Object.entries(STATE.curves)) {
             if (!STATE.modelVisible[name] || !data.curve) continue;
-            const { t, p } = data.curve;
-            ctx.strokeStyle = MODEL_META[name].color;
+            const { t, v } = data.curve;
+            ctx.strokeStyle = modelMeta()[name].color;
             ctx.lineWidth = 2.5;
             ctx.beginPath();
             let started = false;
             for (let i = 0; i < t.length; i++) {
-                const x = toX(t[i]), y = toY(p[i]);
+                const x = toX(t[i]), y = toY(toDisp(v[i]));
                 if (!started) { ctx.moveTo(x, y); started = true; }
                 else ctx.lineTo(x, y);
             }
@@ -515,7 +582,7 @@
 
         // Points
         STATE.points.forEach((pt, i) => {
-            const x = toX(pt.duration), y = toY(pt.power);
+            const x = toX(pt.duration), y = toY(toDisp(pt.value));
             if (x < pL || x > pR || y < pT || y > pB) return;
             ctx.beginPath();
             ctx.arc(x, y, 6, 0, Math.PI * 2);
@@ -578,16 +645,16 @@
 
     function sampleCurveAt(curveData, duration) {
         // Binary search for the closest point in the curve, then interpolate
-        const { t, p } = curveData;
-        if (duration <= t[0]) return p[0];
-        if (duration >= t[t.length - 1]) return p[t.length - 1];
+        const { t, v } = curveData;
+        if (duration <= t[0]) return v[0];
+        if (duration >= t[t.length - 1]) return v[t.length - 1];
         let lo = 0, hi = t.length - 1;
         while (hi - lo > 1) {
             const mid = (lo + hi) >> 1;
             if (t[mid] <= duration) lo = mid; else hi = mid;
         }
         const frac = (Math.log10(duration) - Math.log10(t[lo])) / (Math.log10(t[hi]) - Math.log10(t[lo]));
-        return p[lo] + frac * (p[hi] - p[lo]);
+        return v[lo] + frac * (v[hi] - v[lo]);
     }
 
     function drawHover(pL, pR, pT, pB) {
@@ -606,17 +673,19 @@
 
         // Collect values from visible curves
         const items = [];
+        const td = dom().toDisplay;
+        const fmtVal = dom().formatValue;
         for (const [name, data] of Object.entries(STATE.curves)) {
             if (!STATE.modelVisible[name] || !data.curve) continue;
-            const power = sampleCurveAt(data.curve, dur);
-            items.push({ name, color: MODEL_META[name].color, label: MODEL_META[name].label, power });
+            const raw = sampleCurveAt(data.curve, dur);
+            items.push({ name, color: modelMeta()[name].color, label: modelMeta()[name].label, displayVal: td(raw) });
 
             // Draw dot on curve
-            const dy = toY(power);
+            const dy = toY(td(raw));
             if (dy >= pT && dy <= pB) {
                 ctx.beginPath();
                 ctx.arc(hx, dy, 4, 0, Math.PI * 2);
-                ctx.fillStyle = MODEL_META[name].color;
+                ctx.fillStyle = modelMeta()[name].color;
                 ctx.fill();
                 ctx.strokeStyle = 'white';
                 ctx.lineWidth = 1.5;
@@ -629,7 +698,10 @@
         // Tooltip
         ctx.font = '11px system-ui, sans-serif';
         const durLabel = formatDuration(Math.round(dur));
-        const lines = [durLabel, ...items.map(it => `${it.label}: ${Math.round(it.power)}W`)];
+        const fmtTip = STATE.domain === 'power'
+            ? v => Math.round(v) + 'W'
+            : v => v.toFixed(1) + ' km/h';
+        const lines = [durLabel, ...items.map(it => `${it.label}: ${fmtTip(it.displayVal)}`)];
         const lineH = 16;
         const pad = 8;
         const maxW = Math.max(...lines.map(l => ctx.measureText(l).width));
@@ -660,7 +732,7 @@
             ctx.fillStyle = it.color;
             ctx.fillRect(tx + pad, ly - 7, 8, 3);
             ctx.fillStyle = '#374151';
-            ctx.fillText(`${it.label}: ${Math.round(it.power)}W`, tx + pad + 12, ly);
+            ctx.fillText(`${it.label}: ${fmtTip(it.displayVal)}`, tx + pad + 12, ly);
         });
     }
 
@@ -676,7 +748,7 @@
     function hitTest(pos) {
         for (let i = STATE.points.length - 1; i >= 0; i--) {
             const pt = STATE.points[i];
-            const dx = toX(pt.duration) - pos.x, dy = toY(pt.power) - pos.y;
+            const dx = toX(pt.duration) - pos.x, dy = toY(dom().toDisplay(pt.value)) - pos.y;
             if (dx * dx + dy * dy < 100) return i;  // 10px radius
         }
         return -1;
@@ -701,7 +773,7 @@
                 index: idx,
                 startX: e.clientX, startY: e.clientY,
                 origDuration: STATE.points[idx].duration,
-                origPower: STATE.points[idx].power,
+                origValue: STATE.points[idx].value,
             };
             STATE.hasDragged = false;
             e.preventDefault();
@@ -721,12 +793,11 @@
             if (Math.abs(dx) + Math.abs(dy) > 4) STATE.hasDragged = true;
 
             if (STATE.hasDragged && inPlotArea(pos)) {
-                const [xMin, xMax] = xRange();
-                const [yLo, yHi] = yRange();
                 const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
-                const pow = Math.max(0, fromY(pos.y));
+                const dispVal = Math.max(0, fromY(pos.y));
+                const native = dom().fromDisplay(dispVal);
                 STATE.points[STATE.dragging.index].duration = Math.round(dur);
-                STATE.points[STATE.dragging.index].power = Math.round(pow);
+                STATE.points[STATE.dragging.index].value = STATE.domain === 'power' ? Math.round(native) : native;
                 draw();
             }
             return;
@@ -808,8 +879,8 @@
             if (hitTest(pos) >= 0) return;
 
             const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
-            const pow = Math.max(0, fromY(pos.y));
-            openAddDialogAt(Math.round(dur), Math.round(pow), e.clientX, e.clientY);
+            const dispVal = Math.max(0, fromY(pos.y));
+            openAddDialogAt(Math.round(dur), dispVal, e.clientX, e.clientY);
         }
     });
 
@@ -840,7 +911,7 @@
                 index: idx,
                 startX: touch.clientX, startY: touch.clientY,
                 origDuration: STATE.points[idx].duration,
-                origPower: STATE.points[idx].power,
+                origValue: STATE.points[idx].value,
             };
             STATE.hasDragged = false;
             e.preventDefault();
@@ -857,9 +928,10 @@
 
         if (STATE.hasDragged && inPlotArea(pos)) {
             const dur = Math.max(1, Math.min(7200, fromX(pos.x)));
-            const pow = Math.max(0, fromY(pos.y));
+            const dispVal = Math.max(0, fromY(pos.y));
+            const native = dom().fromDisplay(dispVal);
             STATE.points[STATE.dragging.index].duration = Math.round(dur);
-            STATE.points[STATE.dragging.index].power = Math.round(pow);
+            STATE.points[STATE.dragging.index].value = STATE.domain === 'power' ? Math.round(native) : native;
             draw();
         }
         e.preventDefault();
@@ -896,24 +968,32 @@
         dlg.style.top = top + 'px';
     }
 
-    function openAddDialogAt(dur, pow, clientX, clientY) {
+    function updateDialogLabels() {
+        $('dlg-value-label').textContent = STATE.domain === 'power' ? 'Power' : 'Speed';
+        $('dlg-value-unit').textContent = dom().unit;
+    }
+
+    function openAddDialogAt(dur, dispVal, clientX, clientY) {
         closeDialog();
         STATE.dialogMode = 'add';
         STATE.dialogIndex = -1;
-        document.getElementById('dlg-title').textContent = 'Add Point';
-        document.getElementById('dlg-delete-btn').style.display = 'none';
-        document.getElementById('dlg-min').value = Math.floor(dur / 60);
-        document.getElementById('dlg-sec').value = dur % 60;
-        document.getElementById('dlg-power').value = pow;
+        $('dlg-title').textContent = 'Add Point';
+        $('dlg-delete-btn').style.display = 'none';
+        $('dlg-min').value = Math.floor(dur / 60);
+        $('dlg-sec').value = dur % 60;
+        $('dlg-value').value = STATE.domain === 'power' ? Math.round(dispVal) : dispVal.toFixed(1);
+        $('dlg-value').step = STATE.domain === 'power' ? '1' : '0.1';
+        updateDialogLabels();
         positionDialog(clientX, clientY);
         dlg.classList.add('visible');
-        document.getElementById('dlg-power').select();
+        $('dlg-value').select();
     }
 
     function openAddDialog() {
         // From the side panel button — center dialog
         const rect = canvas.getBoundingClientRect();
-        openAddDialogAt(300, 300, rect.left + rect.width / 2, rect.top + rect.height / 2);
+        const defaultVal = STATE.domain === 'power' ? 300 : 15;
+        openAddDialogAt(300, defaultVal, rect.left + rect.width / 2, rect.top + rect.height / 2);
     }
 
     function openEditDialog(index, clientX, clientY) {
@@ -921,26 +1001,30 @@
         STATE.dialogMode = 'edit';
         STATE.dialogIndex = index;
         const pt = STATE.points[index];
-        document.getElementById('dlg-title').textContent = 'Edit Point';
-        document.getElementById('dlg-delete-btn').style.display = '';
-        document.getElementById('dlg-min').value = Math.floor(pt.duration / 60);
-        document.getElementById('dlg-sec').value = pt.duration % 60;
-        document.getElementById('dlg-power').value = pt.power;
+        const dispVal = dom().toDisplay(pt.value);
+        $('dlg-title').textContent = 'Edit Point';
+        $('dlg-delete-btn').style.display = '';
+        $('dlg-min').value = Math.floor(pt.duration / 60);
+        $('dlg-sec').value = pt.duration % 60;
+        $('dlg-value').value = STATE.domain === 'power' ? Math.round(dispVal) : dispVal.toFixed(1);
+        $('dlg-value').step = STATE.domain === 'power' ? '1' : '0.1';
+        updateDialogLabels();
         positionDialog(clientX, clientY);
         dlg.classList.add('visible');
         draw();
     }
 
     function saveDialog() {
-        const min = parseInt(document.getElementById('dlg-min').value) || 0;
-        const sec = parseInt(document.getElementById('dlg-sec').value) || 0;
+        const min = parseInt($('dlg-min').value) || 0;
+        const sec = parseInt($('dlg-sec').value) || 0;
         const dur = Math.max(1, min * 60 + sec);
-        const pow = Math.max(1, parseInt(document.getElementById('dlg-power').value) || 0);
+        const dispVal = parseFloat($('dlg-value').value) || 0;
+        const native = dom().fromDisplay(Math.max(0.01, dispVal));
 
         if (STATE.dialogMode === 'add') {
-            STATE.points.push({ duration: dur, power: pow });
+            STATE.points.push({ duration: dur, value: native });
         } else if (STATE.dialogMode === 'edit' && STATE.dialogIndex >= 0) {
-            STATE.points[STATE.dialogIndex] = { duration: dur, power: pow };
+            STATE.points[STATE.dialogIndex] = { duration: dur, value: native };
         }
 
         closeDialog();
@@ -997,11 +1081,12 @@
         // Sort display by duration
         const sorted = STATE.points.map((p, i) => ({ ...p, i })).sort((a, b) => a.duration - b.duration);
 
-        let html = '<table class="data-table"><thead><tr><th>Duration</th><th>Power</th><th></th></tr></thead><tbody>';
-        sorted.forEach(({ duration, power, i }) => {
+        const valHeader = STATE.domain === 'power' ? 'Power' : 'Speed';
+        let html = `<table class="data-table"><thead><tr><th>Duration</th><th>${valHeader}</th><th></th></tr></thead><tbody>`;
+        sorted.forEach(({ duration, value, i }) => {
             html += `<tr>
                 <td>${formatDuration(duration)}</td>
-                <td>${power}W</td>
+                <td>${dom().formatValue(value)}</td>
                 <td class="actions">
                     <button class="btn-tiny" onclick="removePoint(${i})" title="Delete">&times;</button>
                 </td>
@@ -1025,7 +1110,7 @@
         const n = STATE.points.length;
         let html = '';
 
-        for (const [name, meta] of Object.entries(MODEL_META)) {
+        for (const [name, meta] of Object.entries(modelMeta())) {
             const enough = n >= meta.min;
             const checked = STATE.modelVisible[name] ? 'checked' : '';
             const curveData = STATE.curves[name];
@@ -1045,12 +1130,14 @@
                 html += `<div class="model-hint model-hint-need">Add ${need} more point${need > 1 ? 's' : ''} to fit (needs ${meta.min})</div>`;
             } else if (hasFit) {
                 html += '<div class="model-params">';
+                const pLabels = dom().paramLabels;
                 for (const [key, val] of Object.entries(curveData.params)) {
-                    const [label, unit] = PARAM_LABELS[key] || [key, ''];
+                    const [label, unit] = pLabels[key] || [key, ''];
                     let display;
                     if (key === 'w_prime') display = val >= 1000 ? (val / 1000).toFixed(1) + ' kJ' : val.toFixed(0) + ' J';
-                    else if (key === 'tcp_max' || key === 'map_d') display = formatDuration(Math.round(val));
+                    else if (key === 'tcp_max' || key === 'map_duration') display = formatDuration(Math.round(val));
                     else if (key === 'gamma_s' || key === 'gamma_l') display = val.toFixed(2);
+                    else if (unit === 'km/h') display = (val * 3.6).toFixed(1) + ' km/h';
                     else display = val.toFixed(0) + (unit ? ' ' + unit : '');
                     html += `<div class="param-item"><span class="param-name">${label}</span><span class="param-value">${display}</span></div>`;
                 }
@@ -1085,7 +1172,8 @@
         fitTimer = setTimeout(() => {
             const data = JSON.stringify({
                 durations: STATE.points.map(p => p.duration),
-                powers: STATE.points.map(p => p.power),
+                values: STATE.points.map(p => p.value),
+                domain: STATE.domain,
             });
             fitPending = true;
             Analysis.run(data);
@@ -1126,19 +1214,54 @@
 
     function persistPoints() {
         try {
-            localStorage.setItem('silhouette_demo_points', JSON.stringify(STATE.points));
+            localStorage.setItem('silhouette_demo_data', JSON.stringify({
+                domain: STATE.domain,
+                points: STATE.points,
+            }));
         } catch (e) { /* ignore */ }
     }
 
     function loadPoints() {
         try {
-            const saved = localStorage.getItem('silhouette_demo_points');
+            const saved = localStorage.getItem('silhouette_demo_data');
             if (saved) {
-                STATE.points = JSON.parse(saved);
+                const data = JSON.parse(saved);
+                if (data.domain) STATE.domain = data.domain;
+                if (data.points) STATE.points = data.points;
+                return STATE.points.length > 0;
+            }
+            // Migrate from old format
+            const old = localStorage.getItem('silhouette_demo_points');
+            if (old) {
+                const pts = JSON.parse(old);
+                STATE.points = pts.map(p => ({ duration: p.duration, value: p.power ?? p.value }));
+                localStorage.removeItem('silhouette_demo_points');
                 return STATE.points.length > 0;
             }
         } catch (e) { /* ignore */ }
         return false;
+    }
+
+    // =========================================================================
+    // Domain toggle
+    // =========================================================================
+
+    function setDomain(d) {
+        if (d === STATE.domain) return;
+        STATE.domain = d;
+        STATE.points = [];
+        STATE.curves = {};
+        STATE.zoom = null;
+        yMaxDefault = dom().yDefault;
+
+        // Update toggle buttons
+        $('domain-power').classList.toggle('active', d === 'power');
+        $('domain-speed').classList.toggle('active', d === 'speed');
+
+        renderTable();
+        renderModels();
+        draw();
+        persistPoints();
     }
 
     // =========================================================================
@@ -1147,35 +1270,56 @@
 
     function generateCode() {
         const pts = STATE.points.slice().sort((a, b) => a.duration - b.duration);
+        const isPower = STATE.domain === 'power';
+        const suffix = isPower ? 'Power' : 'Speed';
+        const valVar = isPower ? 'powers' : 'speeds';
+        const valComment = isPower ? 'watts' : 'm/s';
+
+        // Class name mappings per domain
+        const CLASS = isPower ? {
+            two_param: 'TwoParamCriticalPowerRegressor',
+            three_param: 'ThreeParamCriticalPowerRegressor',
+            exp: 'ExpPowerRegressor',
+            omni: 'OmniDomainPowerRegressor',
+            minimal: 'MinimalPowerPowerRegressor',
+        } : {
+            two_param: 'TwoParamCriticalSpeedRegressor',
+            three_param: 'ThreeParamCriticalSpeedRegressor',
+            exp: 'ExpSpeedRegressor',
+            omni: 'OmniDomainSpeedRegressor',
+            minimal: 'MinimalPowerSpeedRegressor',
+        };
 
         if (pts.length === 0) {
+            const defClass = CLASS.two_param;
+            const cp = isPower ? 'cp' : 'cs';
+            const cpLabel = isPower ? 'CP' : 'CS';
+            const cpUnit = isPower ? 'W' : 'm/s';
+            const wVar = isPower ? 'w_prime' : 'd_prime';
+            const wLabel = isPower ? "W'" : "D'";
+            const wUnit = isPower ? 'J' : 'm';
+            const exVals = isPower ? '[950, 450, 350, 320, 290, 250]' : '[5.8, 5.0, 4.5, 4.2, 4.0, 3.8]';
             return `import numpy as np
-from silhouette import (
-    TwoParamCriticalPowerRegressor,
-    ThreeParamCriticalPowerRegressor,
-    ExpPowerRegressor,
-    OmniDomainPowerRegressor,
-    MinimalPowerPowerRegressor,
-)
+from silhouette import ${defClass}
 from silhouette.plotting import PowerDurationDisplay
 
 # Add data points to the chart, then view this code again.
 # Example:
 durations = np.array([5, 60, 300, 600, 1200, 3600])
-powers = np.array([950, 450, 350, 320, 290, 250])
+${valVar} = np.array(${exVals})
 
 X = durations.reshape(-1, 1)
 
-reg = TwoParamCriticalPowerRegressor()
-reg.fit(X, powers)
-print(f"CP = {reg.cp_:.0f} W")
-print(f"W' = {reg.w_prime_:.0f} J")
+reg = ${defClass}()
+reg.fit(X, ${valVar})
+print(f"${cpLabel} = {reg.${cp}_:.${isPower ? '0' : '2'}f} ${cpUnit}")
+print(f"${wLabel} = {reg.${wVar}_:.0f} ${wUnit}")
 
-PowerDurationDisplay.from_estimator(reg, X, powers)`;
+PowerDurationDisplay.from_estimator(reg, X, ${valVar})`;
         }
 
         const durStr = pts.map(p => p.duration).join(', ');
-        const powStr = pts.map(p => p.power).join(', ');
+        const valStr = pts.map(p => isPower ? Math.round(p.value) : p.value.toFixed(2)).join(', ');
 
         const visibleModels = [];
         const visibleNames = [];
@@ -1186,13 +1330,12 @@ PowerDurationDisplay.from_estimator(reg, X, powers)`;
         if (pts.length >= 5 && STATE.modelVisible.omni) { visibleModels.push('omni'); visibleNames.push('Omni-Duration'); }
         if (pts.length >= 4 && STATE.modelVisible.minimal_power) { visibleModels.push('minimal'); visibleNames.push('Minimal Power'); }
 
-        // Build imports based on what's visible
         const imports = [];
-        if (visibleModels.includes('two_param') || visibleModels.includes('two_param_work')) imports.push('TwoParamCriticalPowerRegressor');
-        if (visibleModels.includes('three_param')) imports.push('ThreeParamCriticalPowerRegressor');
-        if (visibleModels.includes('exp')) imports.push('ExpPowerRegressor');
-        if (visibleModels.includes('omni')) imports.push('OmniDomainPowerRegressor');
-        if (visibleModels.includes('minimal')) imports.push('MinimalPowerPowerRegressor');
+        if (visibleModels.includes('two_param') || visibleModels.includes('two_param_work')) imports.push(CLASS.two_param);
+        if (visibleModels.includes('three_param')) imports.push(CLASS.three_param);
+        if (visibleModels.includes('exp')) imports.push(CLASS.exp);
+        if (visibleModels.includes('omni')) imports.push(CLASS.omni);
+        if (visibleModels.includes('minimal')) imports.push(CLASS.minimal);
 
         let code = `import numpy as np
 from silhouette import (
@@ -1202,62 +1345,84 @@ from silhouette.plotting import PowerDurationDisplay
 
 # Data
 durations = np.array([${durStr}])  # seconds
-powers = np.array([${powStr}])      # watts
+${valVar} = np.array([${valStr}])  # ${valComment}
 
 X = durations.reshape(-1, 1)
 `;
 
-        if (visibleModels.includes('two_param')) {
-            code += `
-# Two-parameter model: P(t) = cp + w' / t
+        if (isPower) {
+            if (visibleModels.includes('two_param')) code += `
+# Two-parameter model: P(t) = CP + W'/t
 two_param = TwoParamCriticalPowerRegressor()
 two_param.fit(X, powers)
 print(f"CP = {two_param.cp_:.0f} W, W' = {two_param.w_prime_:.0f} J")
 `;
-        }
-
-        if (visibleModels.includes('two_param_work')) {
-            code += `
+            if (visibleModels.includes('two_param_work')) code += `
 # Two-parameter model (work-duration linearization)
 two_param_work = TwoParamCriticalPowerRegressor(fitting="work_duration")
 two_param_work.fit(X, powers)
 print(f"CP = {two_param_work.cp_:.0f} W, W' = {two_param_work.w_prime_:.0f} J")
 `;
-        }
-
-        if (visibleModels.includes('three_param')) {
-            code += `
+            if (visibleModels.includes('three_param')) code += `
 # Three-parameter model (hyperbolic, adds Pmax)
 three_param = ThreeParamCriticalPowerRegressor()
 three_param.fit(X, powers)
 print(f"CP = {three_param.cp_:.0f} W, W' = {three_param.w_prime_:.0f} J, Pmax = {three_param.p_max_:.0f} W")
 `;
-        }
-
-        if (visibleModels.includes('exp')) {
-            code += `
+            if (visibleModels.includes('exp')) code += `
 # Exponential model: P(t) = (Pmax - CP) * exp(-t/tau) + CP
 exp = ExpPowerRegressor()
 exp.fit(X, powers)
 print(f"CP = {exp.cp_:.0f} W, Pmax = {exp.p_max_:.0f} W, tau = {exp.tau_:.0f} s")
 `;
-        }
-
-        if (visibleModels.includes('omni')) {
-            code += `
+            if (visibleModels.includes('omni')) code += `
 # Omni-duration model (full power-duration relationship)
 omni = OmniDomainPowerRegressor()
 omni.fit(X, powers)
 print(f"CP = {omni.cp_:.0f} W, W' = {omni.w_prime_:.0f} J, Pmax = {omni.p_max_:.0f} W")
 `;
-        }
-
-        if (visibleModels.includes('minimal')) {
-            code += `
+            if (visibleModels.includes('minimal')) code += `
 # Minimal power model (Lambert W, Mulligan 2018)
 minimal = MinimalPowerPowerRegressor()
 minimal.fit(X, powers)
-print(f"MAP = {minimal.map_:.0f} W, MAP dur = {minimal.map_d_:.0f} s")
+print(f"MAP = {minimal.map_:.0f} W, MAP dur = {minimal.map_duration_:.0f} s")
+`;
+        } else {
+            if (visibleModels.includes('two_param')) code += `
+# Two-parameter model: v(t) = CS + D'/t
+two_param = TwoParamCriticalSpeedRegressor()
+two_param.fit(X, speeds)
+print(f"CS = {two_param.cs_:.2f} m/s, D' = {two_param.d_prime_:.0f} m")
+`;
+            if (visibleModels.includes('two_param_work')) code += `
+# Two-parameter model (distance-duration linearization)
+two_param_work = TwoParamCriticalSpeedRegressor(fitting="work_duration")
+two_param_work.fit(X, speeds)
+print(f"CS = {two_param_work.cs_:.2f} m/s, D' = {two_param_work.d_prime_:.0f} m")
+`;
+            if (visibleModels.includes('three_param')) code += `
+# Three-parameter model (hyperbolic, adds Smax)
+three_param = ThreeParamCriticalSpeedRegressor()
+three_param.fit(X, speeds)
+print(f"CS = {three_param.cs_:.2f} m/s, D' = {three_param.d_prime_:.0f} m, Smax = {three_param.s_max_:.2f} m/s")
+`;
+            if (visibleModels.includes('exp')) code += `
+# Exponential model: v(t) = (Smax - CS) * exp(-t/tau) + CS
+exp = ExpSpeedRegressor()
+exp.fit(X, speeds)
+print(f"CS = {exp.cs_:.2f} m/s, Smax = {exp.s_max_:.2f} m/s, tau = {exp.tau_:.0f} s")
+`;
+            if (visibleModels.includes('omni')) code += `
+# Omni-duration model (full speed-duration relationship)
+omni = OmniDomainSpeedRegressor()
+omni.fit(X, speeds)
+print(f"CS = {omni.cs_:.2f} m/s, D' = {omni.d_prime_:.0f} m, Smax = {omni.s_max_:.2f} m/s")
+`;
+            if (visibleModels.includes('minimal')) code += `
+# Minimal power model (Lambert W, Mulligan 2018)
+minimal = MinimalPowerSpeedRegressor()
+minimal.fit(X, speeds)
+print(f"MAS = {minimal.map_:.2f} m/s, MAS dur = {minimal.map_duration_:.0f} s")
 `;
         }
 
@@ -1267,13 +1432,13 @@ print(f"MAP = {minimal.map_:.0f} W, MAP dur = {minimal.map_d_:.0f} s")
         } else if (visibleModels.length === 1) {
             code += `
 # Plot
-PowerDurationDisplay.from_estimator(${visibleModels[0]}, X, powers)
+PowerDurationDisplay.from_estimator(${visibleModels[0]}, X, ${valVar})
 `;
         } else {
             code += `
 # Plot
 PowerDurationDisplay.from_estimators(
-    [${visibleModels.join(', ')}], X, powers,
+    [${visibleModels.join(', ')}], X, ${valVar},
     names=[${visibleNames.map(n => `"${n}"`).join(', ')}],
 )
 `;
@@ -1348,6 +1513,11 @@ PowerDurationDisplay.from_estimators(
 
         // Load saved points
         const hadPoints = loadPoints();
+
+        // Restore domain toggle
+        $('domain-power').classList.toggle('active', STATE.domain === 'power');
+        $('domain-speed').classList.toggle('active', STATE.domain === 'speed');
+        yMaxDefault = dom().yDefault;
 
         // Render initial state
         renderTable();
