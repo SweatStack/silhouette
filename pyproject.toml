@@ -1,7 +1,7 @@
 [project]
 name = "silhouette"
-version = "0.5.0"
-description = "The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible."
+version = "0.6.0"
+description = "Fit the curve. See the athlete. The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible."
 readme = "README.md"
 authors = [
     { name = "Aart Goossens", email = "aart@sweatstack.no" }
