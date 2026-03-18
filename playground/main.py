@@ -18,6 +18,7 @@ data = json.loads(str(ctx.params))
 durations = np.array(data["durations"], dtype=float)
 values = np.array(data["values"], dtype=float)
 domain = data.get("domain", "power")
+body_mass = data.get("bodyMass", 70)
 
 X = durations.reshape(-1, 1)
 
@@ -61,7 +62,7 @@ else:
         "exponential": (ExpPowerRegressor, 3, {}),
         "omni": (OmniDomainPowerRegressor, 5, {}),
         "minimal_power": (MinimalPowerPowerRegressor, 4, {}),
-        "vdot": (VDOTPowerRegressor, 2, {}),
+        "vdot": (VDOTPowerRegressor, 2, {"body_mass": body_mass}),
     }
 
 for name, (Model, min_points, kwargs) in models.items():

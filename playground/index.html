@@ -87,6 +87,39 @@
         .domain-toggle button.active { background: #1f2937; color: #fff; }
         .domain-toggle button:not(.active):hover { background: #f9fafb; }
 
+        .body-mass-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+        .body-mass-row label {
+            font-weight: 500;
+        }
+        .body-mass-field {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .body-mass-field input {
+            width: 3.5rem;
+            padding: 0.2rem 0.35rem;
+            font-size: 0.8rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #fff;
+            text-align: right;
+            color: #1f2937;
+        }
+        .body-mass-field .unit {
+            color: #9ca3af;
+            font-size: 0.75rem;
+        }
+
         .side-panel {
             display: flex;
             flex-direction: column;
@@ -282,6 +315,14 @@
                         <button id="domain-power" class="active" onclick="setDomain('power')">Power (cycling)</button>
                         <button id="domain-speed" onclick="setDomain('speed')">Speed (running)</button>
                     </div>
+                    <div id="body-mass-row" class="body-mass-row">
+                        <label for="body-mass-input">Body mass</label>
+                        <div class="body-mass-field">
+                            <input type="number" id="body-mass-input" min="30" max="200" step="1" value="70"
+                                onchange="setBodyMass(this.value)" onkeyup="if(event.key==='Enter') this.blur()">
+                            <span class="unit">kg</span>
+                        </div>
+                    </div>
                     <div class="panel-card">
                         <h3>Models</h3>
                         <div id="model-toggles"></div>
@@ -378,6 +419,7 @@
 
     const STATE = {
         domain: 'power',      // 'power' | 'speed'
+        bodyMass: 70,         // kg, used by VDOT power model
         points: [],           // [{duration, value}, ...] — value is W or m/s
         curves: {},           // {modelName: {params, curve: {t, v}}}
         modelVisible: { two_parameter: true, two_parameter_work: false, three_parameter: false, exponential: false, omni: true, minimal_power: false, vdot: false },
@@ -1194,6 +1236,7 @@
                 durations: STATE.points.map(p => p.duration),
                 values: STATE.points.map(p => p.value),
                 domain: STATE.domain,
+                bodyMass: STATE.bodyMass,
             });
             fitPending = true;
             Analysis.run(data);
@@ -1236,6 +1279,7 @@
         try {
             localStorage.setItem('silhouette_demo_data', JSON.stringify({
                 domain: STATE.domain,
+                bodyMass: STATE.bodyMass,
                 points: STATE.points,
             }));
         } catch (e) { /* ignore */ }
@@ -1247,6 +1291,7 @@
             if (saved) {
                 const data = JSON.parse(saved);
                 if (data.domain) STATE.domain = data.domain;
+                if (data.bodyMass) STATE.bodyMass = data.bodyMass;
                 if (data.points) STATE.points = data.points;
                 return STATE.points.length > 0;
             }
@@ -1282,6 +1327,14 @@
         renderModels();
         draw();
         persistPoints();
+    }
+
+    function setBodyMass(val) {
+        const mass = parseFloat(val);
+        if (!mass || mass < 30 || mass > 200) return;
+        STATE.bodyMass = mass;
+        persistPoints();
+        requestFit();
     }
 
     // =========================================================================
@@ -1538,6 +1591,9 @@ PowerDurationDisplay.from_estimators(
         $('domain-power').classList.toggle('active', STATE.domain === 'power');
         $('domain-speed').classList.toggle('active', STATE.domain === 'speed');
         yMaxDefault = dom().yDefault;
+
+        // Restore body mass
+        $('body-mass-input').value = STATE.bodyMass;
 
         // Render initial state
         renderTable();
