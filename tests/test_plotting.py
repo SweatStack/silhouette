@@ -4,33 +4,33 @@ matplotlib.use("Agg")
 import numpy as np
 import pytest
 
-from silhouette import TwoParameterRegressor, OmniDurationRegressor, FPCARegressor
+from silhouette import TwoParamCriticalPowerRegressor, OmniDomainPowerRegressor, FPCAPowerRegressor  # noqa: E501
 from silhouette.plotting import PowerDurationDisplay, ModeOfVarianceDisplay
 
 
 @pytest.fixture
 def data():
-    durations = np.array([30, 60, 120, 300, 600, 1200])
-    power = np.array([600, 480, 400, 340, 310, 290])
+    durations = np.array([120, 180, 300, 600, 900])
+    power = np.array([400, 370, 340, 310, 290])
     return durations.reshape(-1, 1), power
 
 
 @pytest.fixture
 def fitted_2p(data):
     X, y = data
-    return TwoParameterRegressor().fit(X, y)
+    return TwoParamCriticalPowerRegressor().fit(X, y)
 
 
 @pytest.fixture
 def fitted_omni(data):
     X, y = data
-    return OmniDurationRegressor().fit(X, y)
+    return OmniDomainPowerRegressor().fit(X, y)
 
 
 @pytest.fixture
 def fitted_fpca(data):
     X, y = data
-    reg = FPCARegressor.from_model()
+    reg = FPCAPowerRegressor.from_model()
     return reg.fit(X, y)
 
 
@@ -58,7 +58,7 @@ class TestPowerDurationDisplay:
     def test_from_estimator_default_name(self, fitted_omni, data):
         X, y = data
         display = PowerDurationDisplay.from_estimator(fitted_omni, X, y)
-        assert display.lines_[0].get_label() == "OmniDurationRegressor"
+        assert display.lines_[0].get_label() == "OmniDomainPowerRegressor"
 
     def test_from_estimators(self, fitted_2p, fitted_omni, data):
         X, y = data
@@ -82,8 +82,8 @@ class TestPowerDurationDisplay:
         display = PowerDurationDisplay.from_estimators(
             [fitted_2p, fitted_omni], X, y,
         )
-        assert display.lines_[0].get_label() == "TwoParameterRegressor"
-        assert display.lines_[1].get_label() == "OmniDurationRegressor"
+        assert display.lines_[0].get_label() == "TwoParamCriticalPowerRegressor"
+        assert display.lines_[1].get_label() == "OmniDomainPowerRegressor"
 
     def test_custom_ax(self, fitted_omni, data):
         import matplotlib.pyplot as plt

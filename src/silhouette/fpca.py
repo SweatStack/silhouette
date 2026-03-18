@@ -86,7 +86,7 @@ def _evaluate_curve(t, fpc1, fpc2, fpc3, model):
     return float(result[0]) if scalar else result
 
 
-class FPCARegressor(RegressorMixin, BaseEstimator):
+class FPCAPowerRegressor(RegressorMixin, BaseEstimator):
     """FPCA power-duration model (F3 model).
 
     A data-driven power-duration model based on Functional Principal Component
@@ -103,8 +103,8 @@ class FPCARegressor(RegressorMixin, BaseEstimator):
     Parameters
     ----------
     population_model : _PopulationModel
-        Pre-fitted population model. Use ``FPCARegressor.from_model()`` to
-        create an instance.
+        Pre-fitted population model. Use ``FPCAPowerRegressor.from_model()``
+        to create an instance.
 
     Attributes
     ----------
@@ -134,7 +134,7 @@ class FPCARegressor(RegressorMixin, BaseEstimator):
 
     @classmethod
     def from_model(cls, path=None):
-        """Create an FPCARegressor with a pre-fitted population model.
+        """Create an FPCAPowerRegressor with a pre-fitted population model.
 
         Parameters
         ----------
@@ -144,7 +144,7 @@ class FPCARegressor(RegressorMixin, BaseEstimator):
 
         Returns
         -------
-        FPCARegressor
+        FPCAPowerRegressor
             Ready to fit to individual athlete data.
         """
         if path is None:
@@ -156,7 +156,7 @@ class FPCARegressor(RegressorMixin, BaseEstimator):
     def _check_population_model(self):
         if self.population_model is None:
             raise ValueError(
-                "No population model loaded. Use FPCARegressor.from_model() "
+                "No population model loaded. Use FPCAPowerRegressor.from_model() "
                 "to create an instance."
             )
 

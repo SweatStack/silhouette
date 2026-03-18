@@ -1,15 +1,27 @@
 from importlib.metadata import version
 
-from silhouette.two_parameter import TwoParameterRegressor
-from silhouette.three_parameter import ThreeParameterRegressor
-from silhouette.omni import OmniDurationRegressor
-from silhouette.fpca import FPCARegressor
+from silhouette.two_parameter import (
+    TwoParamCriticalPowerRegressor,
+    TwoParamCriticalSpeedRegressor,
+)
+from silhouette.three_parameter import (
+    ThreeParamCriticalPowerRegressor,
+    ThreeParamCriticalSpeedRegressor,
+)
+from silhouette.omni import (
+    OmniDomainPowerRegressor,
+    OmniDomainSpeedRegressor,
+)
+from silhouette.fpca import FPCAPowerRegressor
 
 __version__ = version("silhouette")
 
 __all__ = [
-    "TwoParameterRegressor",
-    "ThreeParameterRegressor",
-    "OmniDurationRegressor",
-    "FPCARegressor",
+    "TwoParamCriticalPowerRegressor",
+    "TwoParamCriticalSpeedRegressor",
+    "ThreeParamCriticalPowerRegressor",
+    "ThreeParamCriticalSpeedRegressor",
+    "OmniDomainPowerRegressor",
+    "OmniDomainSpeedRegressor",
+    "FPCAPowerRegressor",
 ]

@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from silhouette import FPCARegressor
+from silhouette import FPCAPowerRegressor
 
 
 @pytest.fixture
 def reg():
-    return FPCARegressor.from_model()
+    return FPCAPowerRegressor.from_model()
 
 
 @pytest.fixture
@@ -14,13 +14,13 @@ def synthetic_data(reg):
     """A power-duration curve generated from known FPC scores."""
     fpc1, fpc2, fpc3 = 0.3, -0.1, 0.05
     t = reg.population_model.time_grid
-    power = FPCARegressor.curve(t, fpc1=fpc1, fpc2=fpc2, fpc3=fpc3)
+    power = FPCAPowerRegressor.curve(t, fpc1=fpc1, fpc2=fpc2, fpc3=fpc3)
     return t.reshape(-1, 1), power, (fpc1, fpc2, fpc3)
 
 
 class TestFromModel:
     def test_loads_bundled_model(self):
-        reg = FPCARegressor.from_model()
+        reg = FPCAPowerRegressor.from_model()
         assert reg.population_model is not None
         assert reg.population_model.mean_function.shape == (90,)
         assert reg.population_model.eigenfunctions.shape == (90, 3)
@@ -31,7 +31,7 @@ class TestFromModel:
         assert len(reg.population_model.time_grid) == 90
 
     def test_without_model_raises(self):
-        reg = FPCARegressor()
+        reg = FPCAPowerRegressor()
         with pytest.raises(ValueError, match="No population model"):
             reg.fit(np.array([[60]]), np.array([400]))
 
@@ -39,20 +39,20 @@ class TestFromModel:
 class TestCurve:
     def test_known_scores(self):
         t = np.array([60, 300, 1200])
-        power = FPCARegressor.curve(t, fpc1=0.0, fpc2=0.0, fpc3=0.0)
+        power = FPCAPowerRegressor.curve(t, fpc1=0.0, fpc2=0.0, fpc3=0.0)
         assert len(power) == 3
         assert np.all(power > 0)
         # Zero scores should give the population mean
         assert power[0] > power[1] > power[2]
 
     def test_scalar_input(self):
-        power = FPCARegressor.curve(300, fpc1=0.0, fpc2=0.0, fpc3=0.0)
+        power = FPCAPowerRegressor.curve(300, fpc1=0.0, fpc2=0.0, fpc3=0.0)
         assert isinstance(float(power), float)
 
     def test_higher_fpc1_means_more_power(self):
         t = np.array([300])
-        low = FPCARegressor.curve(t, fpc1=-0.5, fpc2=0.0, fpc3=0.0)
-        high = FPCARegressor.curve(t, fpc1=0.5, fpc2=0.0, fpc3=0.0)
+        low = FPCAPowerRegressor.curve(t, fpc1=-0.5, fpc2=0.0, fpc3=0.0)
+        high = FPCAPowerRegressor.curve(t, fpc1=0.5, fpc2=0.0, fpc3=0.0)
         assert high[0] > low[0]
 
 
@@ -60,12 +60,12 @@ class TestCurveInverse:
     def test_roundtrip_with_curve(self):
         params = {"fpc1": 0.3, "fpc2": -0.1, "fpc3": 0.0}
         t_in = np.array([60, 300, 1200])
-        power = FPCARegressor.curve(t_in, **params)
-        t_out = FPCARegressor.curve_inverse(power, **params)
+        power = FPCAPowerRegressor.curve(t_in, **params)
+        t_out = FPCAPowerRegressor.curve_inverse(power, **params)
         np.testing.assert_allclose(t_out, t_in, rtol=1e-4)
 
     def test_scalar_input(self):
-        tte = FPCARegressor.curve_inverse(300, fpc1=0.0, fpc2=0.0, fpc3=0.0)
+        tte = FPCAPowerRegressor.curve_inverse(300, fpc1=0.0, fpc2=0.0, fpc3=0.0)
         assert isinstance(tte, float)
 
 

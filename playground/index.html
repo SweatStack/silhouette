@@ -1147,9 +1147,9 @@
         if (pts.length === 0) {
             return `import numpy as np
 from silhouette import (
-    TwoParameterRegressor,
-    ThreeParameterRegressor,
-    OmniDurationRegressor,
+    TwoParamCriticalPowerRegressor,
+    ThreeParamCriticalPowerRegressor,
+    OmniDomainPowerRegressor,
 )
 from silhouette.plotting import PowerDurationDisplay
 
@@ -1160,7 +1160,7 @@ powers = np.array([950, 450, 350, 320, 290, 250])
 
 X = durations.reshape(-1, 1)
 
-reg = TwoParameterRegressor()
+reg = TwoParamCriticalPowerRegressor()
 reg.fit(X, powers)
 print(f"CP = {reg.cp_:.0f} W")
 print(f"W' = {reg.w_prime_:.0f} J")
@@ -1180,9 +1180,9 @@ PowerDurationDisplay.from_estimator(reg, X, powers)`;
 
         let code = `import numpy as np
 from silhouette import (
-    TwoParameterRegressor,
-    ThreeParameterRegressor,
-    OmniDurationRegressor,
+    TwoParamCriticalPowerRegressor,
+    ThreeParamCriticalPowerRegressor,
+    OmniDomainPowerRegressor,
 )
 from silhouette.plotting import PowerDurationDisplay
 
@@ -1196,12 +1196,12 @@ X = durations.reshape(-1, 1)
         if (pts.length >= 2) {
             code += `
 # Two-parameter model: P(t) = cp + w' / t
-two_param = TwoParameterRegressor()
+two_param = TwoParamCriticalPowerRegressor()
 two_param.fit(X, powers)
 print(f"CP = {two_param.cp_:.0f} W, W' = {two_param.w_prime_:.0f} J")
 
 # Two-parameter model (work-duration linearization)
-two_param_work = TwoParameterRegressor(fitting="work_duration")
+two_param_work = TwoParamCriticalPowerRegressor(fitting="work_duration")
 two_param_work.fit(X, powers)
 print(f"CP = {two_param_work.cp_:.0f} W, W' = {two_param_work.w_prime_:.0f} J")
 `;
@@ -1210,7 +1210,7 @@ print(f"CP = {two_param_work.cp_:.0f} W, W' = {two_param_work.w_prime_:.0f} J")
         if (pts.length >= 3) {
             code += `
 # Three-parameter model (adds Pmax)
-three_param = ThreeParameterRegressor()
+three_param = ThreeParamCriticalPowerRegressor()
 three_param.fit(X, powers)
 print(f"CP = {three_param.cp_:.0f} W, W' = {three_param.w_prime_:.0f} J, Pmax = {three_param.p_max_:.0f} W")
 `;
@@ -1219,7 +1219,7 @@ print(f"CP = {three_param.cp_:.0f} W, W' = {three_param.w_prime_:.0f} J, Pmax = 
         if (pts.length >= 5) {
             code += `
 # Omni-duration model (full power-duration relationship)
-omni = OmniDurationRegressor()
+omni = OmniDomainPowerRegressor()
 omni.fit(X, powers)
 print(f"CP = {omni.cp_:.0f} W, W' = {omni.w_prime_:.0f} J, Pmax = {omni.p_max_:.0f} W")
 `;

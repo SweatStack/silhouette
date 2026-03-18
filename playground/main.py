@@ -26,16 +26,16 @@ t_curve = np.logspace(0, np.log10(t_max), 300)
 results = {}
 
 from silhouette import (
-    TwoParameterRegressor,
-    ThreeParameterRegressor,
-    OmniDurationRegressor,
+    TwoParamCriticalPowerRegressor,
+    ThreeParamCriticalPowerRegressor,
+    OmniDomainPowerRegressor,
 )
 
 models = {
-    "two_parameter": (TwoParameterRegressor, 2, {}),
-    "two_parameter_work": (TwoParameterRegressor, 2, {"fitting": "work_duration"}),
-    "three_parameter": (ThreeParameterRegressor, 3, {}),
-    "omni": (OmniDurationRegressor, 5, {}),
+    "two_parameter": (TwoParamCriticalPowerRegressor, 2, {}),
+    "two_parameter_work": (TwoParamCriticalPowerRegressor, 2, {"fitting": "work_duration"}),
+    "three_parameter": (ThreeParamCriticalPowerRegressor, 3, {}),
+    "omni": (OmniDomainPowerRegressor, 5, {}),
 }
 
 for name, (Model, min_points, kwargs) in models.items():
