@@ -13,7 +13,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 | `TwoParamCriticalPowerRegressor` | CP, W' |
 | `ThreeParamCriticalPowerRegressor` | CP, W', P_max |
 | `OmniDomainPowerRegressor` | CP, W', P_max, a, tcp_max |
-| `MinimalPowerPowerRegressor` *experimental* | MAP, MAP duration, gamma_l, gamma_s |
+| `MinimalPowerPowerRegressor` ⚠️ *experimental* | MAP, MAP duration, gamma_l, gamma_s |
 | `FPCAPowerRegressor` | FPC1, FPC2, FPC3 |
 
 ### Speed (running)
@@ -22,7 +22,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 |---|---|
 | `TwoParamCriticalSpeedRegressor` | CS, D' |
 | `ThreeParamCriticalSpeedRegressor` | CS, D', S_max |
-| `OmniDomainSpeedRegressor` *experimental* | CS, D', S_max, a, tcp_max |
+| `OmniDomainSpeedRegressor` ⚠️ *experimental* | CS, D', S_max, a, tcp_max |
 | `MinimalPowerSpeedRegressor` | MAS, MAS duration, gamma_l, gamma_s |
 
 ## Installation
