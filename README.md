@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="80" align="left" style="margin-right: 1rem;">
+
 # Silhouette
 
 Fit the curve. See the athlete. The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible.

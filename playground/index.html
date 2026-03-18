@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>Silhouette - Intensity-duration modelling toolkit</title>
     <script src="mini-coi.js"></script>
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -1277,11 +1278,15 @@
 
     function persistPoints() {
         try {
-            localStorage.setItem('silhouette_demo_data', JSON.stringify({
+            const prev = JSON.parse(localStorage.getItem('silhouette_demo_data') || '{}');
+            const merged = {
                 domain: STATE.domain,
                 bodyMass: STATE.bodyMass,
-                points: STATE.points,
-            }));
+                powerPoints: prev.powerPoints || [],
+                speedPoints: prev.speedPoints || [],
+            };
+            merged[STATE.domain === 'power' ? 'powerPoints' : 'speedPoints'] = STATE.points;
+            localStorage.setItem('silhouette_demo_data', JSON.stringify(merged));
         } catch (e) { /* ignore */ }
     }
 
@@ -1292,7 +1297,13 @@
                 const data = JSON.parse(saved);
                 if (data.domain) STATE.domain = data.domain;
                 if (data.bodyMass) STATE.bodyMass = data.bodyMass;
-                if (data.points) STATE.points = data.points;
+                // New per-domain format
+                if (data.powerPoints || data.speedPoints) {
+                    STATE.points = (STATE.domain === 'power' ? data.powerPoints : data.speedPoints) || [];
+                } else if (data.points) {
+                    // Migrate from single-points format
+                    STATE.points = data.points;
+                }
                 return STATE.points.length > 0;
             }
             // Migrate from old format
@@ -1313,11 +1324,27 @@
 
     function setDomain(d) {
         if (d === STATE.domain) return;
+
+        // Save current domain's points before switching
+        persistPoints();
+
         STATE.domain = d;
-        STATE.points = [];
         STATE.curves = {};
         STATE.zoom = null;
         yMaxDefault = dom().yDefault;
+
+        // Restore the other domain's points
+        try {
+            const saved = localStorage.getItem('silhouette_demo_data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                STATE.points = (d === 'power' ? data.powerPoints : data.speedPoints) || [];
+            } else {
+                STATE.points = [];
+            }
+        } catch (e) {
+            STATE.points = [];
+        }
 
         // Update toggle buttons
         $('domain-power').classList.toggle('active', d === 'power');
