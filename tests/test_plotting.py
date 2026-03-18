@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 
 from silhouette import TwoParamCriticalPowerRegressor, OmniDomainPowerRegressor, FPCAPowerRegressor  # noqa: E501
-from silhouette.plotting import PowerDurationDisplay, ModeOfVarianceDisplay
+from silhouette import MinimalPowerPowerRegressor, MinimalPowerSpeedRegressor
+from silhouette.plotting import PowerDurationDisplay, ModeOfVarianceDisplay, MinimalPowerDisplay
 
 
 @pytest.fixture
@@ -124,3 +125,64 @@ class TestModeOfVarianceDisplay:
     def test_custom_n_sd(self):
         display = ModeOfVarianceDisplay.from_model(n_sd=1, n_lines=10)
         assert display.figure_ is not None
+
+
+class TestMinimalPowerDisplay:
+    @pytest.fixture
+    def fitted_power(self):
+        params = {"map": 400, "map_duration": 300, "gamma_l": 0.06, "gamma_s": 0.1}
+        durations = np.array([60, 120, 300, 600, 1200, 2700])
+        power = MinimalPowerPowerRegressor.curve(durations, **params)
+        X = durations.reshape(-1, 1)
+        return MinimalPowerPowerRegressor().fit(X, power), X, power
+
+    @pytest.fixture
+    def fitted_speed(self):
+        params = {"map": 5, "map_duration": 300, "gamma_l": 0.06, "gamma_s": 0.1}
+        durations = np.array([60, 120, 300, 600, 1200, 2700])
+        speed = MinimalPowerSpeedRegressor.curve(durations, **params)
+        X = durations.reshape(-1, 1)
+        return MinimalPowerSpeedRegressor().fit(X, speed), X, speed
+
+    def test_from_estimator_power(self, fitted_power):
+        reg, X, y = fitted_power
+        display = MinimalPowerDisplay.from_estimator(reg, X, y)
+        assert display.ax_ is not None
+        assert display.figure_ is not None
+        assert display.line_ is not None
+        assert display.scatter_ is not None
+        assert display.band_ is not None
+
+    def test_from_estimator_speed(self, fitted_speed):
+        reg, X, y = fitted_speed
+        display = MinimalPowerDisplay.from_estimator(reg, X, y)
+        assert display.ax_ is not None
+        assert display.scatter_ is not None
+
+    def test_without_data(self, fitted_power):
+        reg, _, _ = fitted_power
+        display = MinimalPowerDisplay.from_estimator(reg)
+        assert display.scatter_ is None
+        assert display.line_ is not None
+
+    def test_without_reference_band(self, fitted_power):
+        reg, X, y = fitted_power
+        display = MinimalPowerDisplay.from_estimator(reg, X, y, reference_band=False)
+        assert display.band_ is None
+
+    def test_custom_name(self, fitted_power):
+        reg, X, y = fitted_power
+        display = MinimalPowerDisplay.from_estimator(reg, X, y, name="My model")
+        assert display.line_.get_label() == "My model"
+
+    def test_power_axes_labels(self, fitted_power):
+        reg, X, y = fitted_power
+        display = MinimalPowerDisplay.from_estimator(reg, X, y)
+        assert "W" in display.ax_.get_xlabel()
+        assert "MAP" in display.ax_.get_ylabel()
+
+    def test_speed_axes_labels(self, fitted_speed):
+        reg, X, y = fitted_speed
+        display = MinimalPowerDisplay.from_estimator(reg, X, y)
+        assert "d" in display.ax_.get_xlabel()
+        assert "v" in display.ax_.get_ylabel()

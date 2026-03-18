@@ -13,6 +13,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 | `TwoParamCriticalPowerRegressor` | CP, W' |
 | `ThreeParamCriticalPowerRegressor` | CP, W', P_max |
 | `OmniDomainPowerRegressor` | CP, W', P_max, a, tcp_max |
+| `MinimalPowerPowerRegressor` *experimental* | MAP, MAP duration, gamma_l, gamma_s |
 | `FPCAPowerRegressor` | FPC1, FPC2, FPC3 |
 
 ### Speed (running)
@@ -22,6 +23,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 | `TwoParamCriticalSpeedRegressor` | CS, D' |
 | `ThreeParamCriticalSpeedRegressor` | CS, D', S_max |
 | `OmniDomainSpeedRegressor` *experimental* | CS, D', S_max, a, tcp_max |
+| `MinimalPowerSpeedRegressor` | MAS, MAS duration, gamma_l, gamma_s |
 
 ## Installation
 
@@ -106,7 +108,17 @@ speed = TwoParamCriticalSpeedRegressor.curve(t, cs=4, d_prime=200)
 
 ## Duration range
 
-Restrict which data points are used for fitting:
+Each model is designed for a specific duration range:
+
+| Model | Recommended range |
+|---|---|
+| Two-parameter | 2-15 min |
+| Three-parameter | up to 15 min |
+| Omni-domain | any |
+| Minimal power | 1 min+ |
+| FPCA | any |
+
+A warning is issued when data falls outside the recommended range. Use `duration_range` to restrict which data points are used for fitting:
 
 ```python
 reg = TwoParamCriticalPowerRegressor(duration_range=(120, 900))
@@ -115,8 +127,6 @@ reg.fit(X, power)  # only uses data between 2 and 15 minutes
 reg.predict(X)           # predict still works at any duration
 reg.duration_mask_       # boolean mask of which points were used
 ```
-
-Models warn when data falls outside their recommended range. Set `duration_range` to suppress the warning and explicitly control the fitting window.
 
 ## Custom bounds
 
@@ -184,9 +194,20 @@ display = ModeOfVarianceDisplay.from_estimator(fpca_reg)
 
 ![Mode of Variance](docs/mode_of_variance.png)
 
+Minimal power model (normalized coordinates with reference band):
+
+```python
+from silhouette.plotting import MinimalPowerDisplay
+
+display = MinimalPowerDisplay.from_estimator(reg_minimal, durations.reshape(-1, 1), power)
+```
+
+![Minimal Power Model](docs/minimal_power_speed.png)
+
 ## References
 
 - Monod, H., & Scherrer, J. (1965). The work capacity of a synergic muscular group. *Ergonomics, 8*(3), 329-338.
 - Morton, R. H. (1996). A 3-parameter critical power model. *Ergonomics, 39*(4), 611-619.
+- Mulligan, M., Adam, G., & Emig, T. (2018). A minimal power model for human running performance. *PloS one, 13*(11), e0206645.
 - Puchowicz, M. J., Baker, J., & Clarke, D. C. (2020). Development and field validation of an omni-domain power-duration model. *Journal of Sports Sciences, 38*(7), 801-813.
 - Puchowicz, M. J., & Skiba, P. F. (2025). Functional Data Analysis of the Power-Duration Relationship in Cyclists. *International Journal of Sports Physiology and Performance, 1*(aop), 1-10.

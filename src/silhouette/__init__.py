@@ -12,6 +12,10 @@ from silhouette.omni import (
     OmniDomainPowerRegressor,
     OmniDomainSpeedRegressor,
 )
+from silhouette.minimal_power import (
+    MinimalPowerPowerRegressor,
+    MinimalPowerSpeedRegressor,
+)
 from silhouette.fpca import FPCAPowerRegressor
 
 __version__ = version("silhouette")
@@ -23,5 +27,7 @@ __all__ = [
     "ThreeParamCriticalSpeedRegressor",
     "OmniDomainPowerRegressor",
     "OmniDomainSpeedRegressor",
+    "MinimalPowerPowerRegressor",
+    "MinimalPowerSpeedRegressor",
     "FPCAPowerRegressor",
 ]

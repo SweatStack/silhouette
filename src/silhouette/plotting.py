@@ -8,6 +8,8 @@ except ImportError as e:
         "Install it with: pip install silhouette[plotting]"
     ) from e
 
+from silhouette.minimal_power import _minimal_power_tte
+
 
 _TICK_CANDIDATES = [
     (1, "1s"), (2, "2s"), (3, "3s"), (5, "5s"),
@@ -348,3 +350,168 @@ class ModeOfVarianceDisplay:
         )
 
         return cls(axes=result_axes, mean_line=result_mean, athlete_line=result_athlete)
+
+
+def _normalized_curve(work_norm, map_val, map_duration, gamma_l, gamma_s):
+    """Compute normalized intensity (intensity/MAP) for normalized work (work/MAP_work).
+
+    Works directly with the Lambert W model in normalized coordinates,
+    avoiding the interpolation needed by the standard curve() method.
+    """
+    map_work = map_val * map_duration
+    work = work_norm * map_work
+    t = _minimal_power_tte(work, map_val, map_duration, gamma_l, gamma_s)
+    intensity = work / t
+    return intensity / map_val
+
+
+class MinimalPowerDisplay:
+    """Normalized minimal power model plot.
+
+    Shows the fitted curve in dimensionless coordinates with an optional
+    reference endurance band. This replicates Figure 2 from Mulligan et al.
+    (2018).
+
+    The axes are normalized by the crossover point (MAP and MAP_work):
+
+    - x-axis: work / (MAP * MAP_duration), log scale
+    - y-axis: intensity / MAP
+
+    Use ``from_estimator`` to create a display.
+
+    Attributes
+    ----------
+    ax_ : matplotlib Axes
+        The axes containing the plot.
+    figure_ : matplotlib Figure
+        The figure containing the plot.
+    line_ : matplotlib Line2D
+        The fitted model curve.
+    scatter_ : matplotlib PathCollection or None
+        The data scatter artist.
+    band_ : matplotlib PolyCollection or None
+        The reference gamma band fill.
+    """
+
+    # Reference gamma values from the paper
+    _REF_LOW = {"gamma_s": 0.15, "gamma_l": 0.04}   # low endurance
+    _REF_HIGH = {"gamma_s": 0.05, "gamma_l": 0.08}   # high endurance
+
+    def __init__(self, *, ax, line, scatter, band):
+        self.ax_ = ax
+        self.figure_ = ax.figure
+        self.line_ = line
+        self.scatter_ = scatter
+        self.band_ = band
+
+    @classmethod
+    def from_estimator(cls, estimator, X=None, y=None, *, reference_band=True,
+                       name=None, ax=None):
+        """Plot a fitted minimal power model in normalized coordinates.
+
+        Parameters
+        ----------
+        estimator : fitted MinimalPowerPowerRegressor or MinimalPowerSpeedRegressor
+            A fitted minimal power regressor.
+        X : array-like of shape (n_samples, 1), optional
+            Durations in seconds.
+        y : array-like of shape (n_samples,), optional
+            Power (W) or speed (m/s).
+        reference_band : bool, default=True
+            If True, draw the reference endurance band showing the range
+            of typical gamma values from the literature.
+        name : str, optional
+            Label for the model curve. Defaults to "Model fit".
+        ax : matplotlib Axes, optional
+            Axes to plot on. Created if None.
+
+        Returns
+        -------
+        MinimalPowerDisplay
+        """
+        from sklearn.utils.validation import check_is_fitted
+
+        check_is_fitted(estimator)
+        ax = _create_axes(ax)
+
+        map_val = estimator.map_
+        map_dur = estimator.map_duration_
+        map_work = map_val * map_dur
+
+        # Detect domain from estimator type
+        from silhouette.minimal_power import MinimalPowerSpeedRegressor
+        is_speed = isinstance(estimator, MinimalPowerSpeedRegressor)
+
+        # Normalized curve range
+        work_norm = np.geomspace(0.1, 30, 500)
+
+        # Reference band
+        band = None
+        if reference_band:
+            y_low = _normalized_curve(
+                work_norm, map_val, map_dur,
+                cls._REF_LOW["gamma_l"], cls._REF_LOW["gamma_s"],
+            )
+            y_high = _normalized_curve(
+                work_norm, map_val, map_dur,
+                cls._REF_HIGH["gamma_l"], cls._REF_HIGH["gamma_s"],
+            )
+            band = ax.fill_between(
+                work_norm, y_low, y_high,
+                color="gray", alpha=0.12,
+                label=(f"Reference ("
+                       f"$\\gamma_s$={cls._REF_HIGH['gamma_s']}-{cls._REF_LOW['gamma_s']}, "
+                       f"$\\gamma_l$={cls._REF_LOW['gamma_l']}-{cls._REF_HIGH['gamma_l']})"),
+            )
+            ax.plot(work_norm, y_low, color="#999999", linewidth=0.8)
+            ax.plot(work_norm, y_high, color="#999999", linewidth=0.8)
+
+        # Fitted model curve
+        y_fit = _normalized_curve(
+            work_norm, map_val, map_dur,
+            estimator.gamma_l_, estimator.gamma_s_,
+        )
+        line, = ax.plot(
+            work_norm, y_fit, linewidth=2, zorder=5,
+            label=name or "Model fit",
+        )
+
+        # Data scatter
+        scatter = None
+        if X is not None and y is not None:
+            durations = np.asarray(X).ravel()
+            intensity = np.asarray(y).ravel()
+            work_data = intensity * durations
+            scatter = ax.scatter(
+                work_data / map_work, intensity / map_val,
+                color="black", s=20, zorder=2, label="data",
+            )
+
+        # Axes setup
+        ax.set_xscale("log")
+        ax.set_xticks([0.25, 0.5, 1, 2.5, 5, 10, 20])
+        ax.set_xticklabels(["0.25", "0.5", "1", "2.5", "5", "10", "20"])
+        ax.minorticks_off()
+        ax.set_yticks([0.8, 0.9, 1.0, 1.1, 1.2])
+        ax.grid(True, alpha=0.3)
+
+        if is_speed:
+            ax.set_xlabel(r"d / $d_c$")
+            ax.set_ylabel(r"$\overline{v}$(d) / $v_m$")
+        else:
+            ax.set_xlabel(r"W / $W_c$")
+            ax.set_ylabel(r"P / MAP")
+
+        # Sensible default limits
+        x_min, x_max = 0.15, 25
+        if X is not None and y is not None:
+            x_data = work_data / map_work
+            x_min = min(x_min, x_data.min() * 0.8)
+            x_max = max(x_max, x_data.max() * 1.2)
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(0.75, 1.25)
+
+        ax.figure.set_size_inches(6, 6)
+        ax.legend(loc="upper right")
+
+        return cls(ax=ax, line=line, scatter=scatter, band=band)

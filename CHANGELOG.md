@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `MinimalPowerPowerRegressor` and `MinimalPowerSpeedRegressor` (both experimental) implementing the Lambert W minimal power model (Mulligan et al., 2018).
+- `MinimalPowerDisplay` for normalized minimal power model plots with reference endurance band, replicating Figure 2 from Mulligan et al. (2018). Works for both power and speed regressors.
 - Speed (running) variants of all parametric models: `TwoParamCriticalSpeedRegressor`, `ThreeParamCriticalSpeedRegressor`, `OmniDomainSpeedRegressor` (experimental). Same formulas as power models with speed-appropriate parameter names (CS, D'), bounds, and defaults.
 - `duration_range` parameter on all parametric models to restrict which data points are used for fitting. Exposes `duration_mask_` fitted attribute.
 - Recommended duration range warnings: `TwoParamCriticalPowerRegressor` warns when data falls outside 2-15 minutes, `ThreeParamCriticalPowerRegressor` warns for data above 15 minutes.
