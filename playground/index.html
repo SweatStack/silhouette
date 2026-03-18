@@ -333,6 +333,21 @@
         </div>
     </div>
 
+    <!-- Experimental model modal -->
+    <div id="experimental-modal" class="modal">
+        <div class="modal-content modal-content-sm">
+            <div class="modal-header">
+                <span class="modal-title">&nbsp;</span>
+                <button class="modal-close" onclick="ExperimentalModal.hide()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><b>Experimental model</b></p>
+                <p>This model has not been scientifically validated for this sport or metric. The underlying equations may have been developed for a different domain and adapted here for exploratory use.</p>
+                <p>Results may be directionally useful but should not be relied upon for training decisions without independent verification. Use with caution.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Framework info modal -->
     <div id="info-modal" class="modal">
         <div class="modal-content modal-content-sm">
@@ -365,7 +380,7 @@
         domain: 'power',      // 'power' | 'speed'
         points: [],           // [{duration, value}, ...] — value is W or m/s
         curves: {},           // {modelName: {params, curve: {t, v}}}
-        modelVisible: { two_parameter: true, two_parameter_work: false, three_parameter: false, exponential: false, omni: true, minimal_power: false },
+        modelVisible: { two_parameter: true, two_parameter_work: false, three_parameter: false, exponential: false, omni: true, minimal_power: false, vdot: false },
         dialogMode: null,     // 'add' | 'edit'
         dialogIndex: -1,      // index of point being edited
         dragging: null,       // {index, startX, startY, origDuration, origValue}
@@ -389,12 +404,14 @@
                 three_parameter:    { label: '3-Parameter',                 desc: 'Hyperbolic model adding Pmax to bound short durations',          color: '#ea580c', min: 3 },
                 exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Pmax toward CP (Hopkins 1989)',           color: '#0891b2', min: 3 },
                 omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                  color: '#16a34a', min: 5 },
-                minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAP and endurance shape (Mulligan 2018)',  color: '#db2777', min: 4 },
+                minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAP and endurance shape (Mulligan 2018)',  color: '#db2777', min: 4, experimental: true },
+                vdot:               { label: 'VDOT',                        desc: 'Daniels-Gilbert single-parameter model (3 min \u2013 2 h)',      color: '#9333ea', min: 2, experimental: true },
             },
             paramLabels: {
                 cp: ['CP', 'W'], w_prime: ["W'", 'J'], p_max: ['Pmax', 'W'],
                 a: ['a', ''], tcp_max: ['tcp_max', 's'], tau: ['\u03c4', 's'],
                 map: ['MAP', 'W'], map_duration: ['MAP dur', 's'], gamma_s: ['\u03b3_s', ''], gamma_l: ['\u03b3_l', ''],
+                vdot: ['VDOT', 'ml/kg/min'],
             },
         },
         speed: {
@@ -406,14 +423,16 @@
                 two_parameter:      { label: '2-Parameter',                 desc: 'v = CS + D\u2032/t, fitted in speed space',                     color: '#2563eb', min: 2 },
                 two_parameter_work: { label: '2-Parameter (dist-duration)', desc: 'Same model, fitted in distance space. Weights longer efforts more.', color: '#7c3aed', min: 2 },
                 three_parameter:    { label: '3-Parameter',                 desc: 'Hyperbolic model adding Smax to bound short durations',          color: '#ea580c', min: 3 },
-                exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Smax toward CS (Hopkins 1989)',           color: '#0891b2', min: 3 },
-                omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                  color: '#16a34a', min: 5 },
+                exponential:        { label: 'Exponential',                 desc: 'Exponential decay from Smax toward CS (Hopkins 1989)',           color: '#0891b2', min: 3, experimental: true },
+                omni:               { label: 'Omni-Duration',               desc: 'Full model from sprints to multi-hour efforts',                  color: '#16a34a', min: 5, experimental: true },
                 minimal_power:      { label: 'Minimal Power',               desc: 'Lambert W model using MAS and endurance shape (Mulligan 2018)',  color: '#db2777', min: 4 },
+                vdot:               { label: 'VDOT',                        desc: 'Daniels-Gilbert single-parameter model (3 min \u2013 2 h)',      color: '#9333ea', min: 2 },
             },
             paramLabels: {
                 cs: ['CS', 'km/h'], d_prime: ["D'", 'm'], s_max: ['Smax', 'km/h'],
                 a: ['a', ''], tcp_max: ['tcp_max', 's'], tau: ['\u03c4', 's'],
                 map: ['MAS', 'km/h'], map_duration: ['MAS dur', 's'], gamma_s: ['\u03b3_s', ''], gamma_l: ['\u03b3_l', ''],
+                vdot: ['VDOT', 'ml/kg/min'],
             },
         },
     };
@@ -1122,6 +1141,7 @@
                         onchange="STATE.modelVisible['${name}']=this.checked; draw()">
                     <span class="model-swatch" style="background: ${meta.color}"></span>
                     <span class="model-label">${meta.label}</span>
+                    ${meta.experimental ? '<button class="experimental-badge" onclick="event.stopPropagation(); ExperimentalModal.show()" title="Experimental model">\u26A0\uFE0F</button>' : ''}
                 </div>
                 <div class="model-desc">${meta.desc}</div>`;
 

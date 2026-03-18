@@ -306,6 +306,22 @@ p {
     height: auto;
 }
 
+/* Experimental badge */
+
+.experimental-badge {
+    border: none;
+    background: none;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.25rem;
+    line-height: 1;
+}
+
+.experimental-badge:hover {
+    transform: scale(1.2);
+}
+
 /* Code modal */
 
 .modal {

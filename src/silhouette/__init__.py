@@ -21,6 +21,7 @@ from silhouette.exponential import (
     ExpSpeedRegressor,
 )
 from silhouette.fpca import FPCAPowerRegressor
+from silhouette.vdot import VDOTPowerRegressor, VDOTSpeedRegressor
 
 __version__ = version("silhouette")
 
@@ -36,4 +37,6 @@ __all__ = [
     "ExpPowerRegressor",
     "ExpSpeedRegressor",
     "FPCAPowerRegressor",
+    "VDOTPowerRegressor",
+    "VDOTSpeedRegressor",
 ]

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+
+- `VDOTSpeedRegressor` implementing the Daniels-Gilbert (1979) VDOT model for running. Single-parameter model predicting equivalent race performances across distances (3 min – 2 hours).
+- `VDOTPowerRegressor` (experimental) adapting the VDOT model to cycling power using 11.7 mL O2/W conversion. Requires `body_mass` parameter.
+- Experimental model badges in the playground: models marked as experimental show a warning icon that opens a dialog explaining the model has not been validated for this sport/metric.
+
 ## [0.5.0] - 2026-03-18
 
 ### Added

@@ -34,6 +34,7 @@ if domain == "speed":
         ExpSpeedRegressor,
         OmniDomainSpeedRegressor,
         MinimalPowerSpeedRegressor,
+        VDOTSpeedRegressor,
     )
     models = {
         "two_parameter": (TwoParamCriticalSpeedRegressor, 2, {}),
@@ -42,6 +43,7 @@ if domain == "speed":
         "exponential": (ExpSpeedRegressor, 3, {}),
         "omni": (OmniDomainSpeedRegressor, 5, {}),
         "minimal_power": (MinimalPowerSpeedRegressor, 4, {}),
+        "vdot": (VDOTSpeedRegressor, 2, {}),
     }
 else:
     from silhouette import (
@@ -50,6 +52,7 @@ else:
         ExpPowerRegressor,
         OmniDomainPowerRegressor,
         MinimalPowerPowerRegressor,
+        VDOTPowerRegressor,
     )
     models = {
         "two_parameter": (TwoParamCriticalPowerRegressor, 2, {}),
@@ -58,6 +61,7 @@ else:
         "exponential": (ExpPowerRegressor, 3, {}),
         "omni": (OmniDomainPowerRegressor, 5, {}),
         "minimal_power": (MinimalPowerPowerRegressor, 4, {}),
+        "vdot": (VDOTPowerRegressor, 2, {}),
     }
 
 for name, (Model, min_points, kwargs) in models.items():

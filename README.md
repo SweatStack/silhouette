@@ -1,6 +1,7 @@
 # Silhouette
 
-The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible.
+Fit the curve. See the athlete. The intensity-duration modelling toolkit for endurance sports. Scikit-learn compatible.
+
 
 **[Try the interactive playground 🚀](https://silhouette.sweatstack.no)**
 
@@ -16,6 +17,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 | `ExpPowerRegressor` | CP, P_max, tau |
 | `MinimalPowerPowerRegressor` ⚠️ *experimental* | MAP, MAP duration, gamma_l, gamma_s |
 | `FPCAPowerRegressor` | FPC1, FPC2, FPC3 |
+| `VDOTPowerRegressor` ⚠️ *experimental* | VDOT |
 
 ### Speed (running)
 
@@ -26,6 +28,7 @@ The intensity-duration modelling toolkit for endurance sports. Scikit-learn comp
 | `ExpSpeedRegressor` ⚠️ *experimental* | CS, S_max, tau |
 | `OmniDomainSpeedRegressor` ⚠️ *experimental* | CS, D', S_max, a, tcp_max |
 | `MinimalPowerSpeedRegressor` | MAS, MAS duration, gamma_l, gamma_s |
+| `VDOTSpeedRegressor` | VDOT |
 
 ## Installation
 
@@ -79,6 +82,31 @@ reg.d_prime_  # distance capacity above CS (m)
 
 Speed models use the same formulas as their power counterparts, with domain-appropriate parameter names, bounds, and defaults.
 
+### VDOT model (running)
+
+```python
+from silhouette import VDOTSpeedRegressor
+
+durations = np.array([180, 300, 600, 900, 1800, 3600])
+speed = np.array([5.5, 5.2, 4.8, 4.6, 4.2, 3.9])
+
+reg = VDOTSpeedRegressor()
+reg.fit(durations.reshape(-1, 1), speed)
+
+reg.vdot_     # VDOT fitness value (ml/kg/min)
+```
+
+The VDOT model (Daniels & Gilbert, 1979) is a single-parameter model that predicts performance across durations. Designed for 3 minutes to 2 hours. The speed variant is the original running model. The power variant is an experimental adaptation using 11.7 mL O2/W and requires `body_mass`:
+
+```python
+from silhouette import VDOTPowerRegressor
+
+reg = VDOTPowerRegressor(body_mass=75)
+reg.fit(durations.reshape(-1, 1), power)
+
+reg.vdot_     # VDOT fitness value (ml/kg/min)
+```
+
 ### FPCA model
 
 ```python
@@ -120,6 +148,7 @@ Each model is designed for a specific duration range:
 | Omni-domain | any |
 | Minimal power | 1 min+ |
 | FPCA | any |
+| VDOT | 3 min – 2 hours |
 
 A warning is issued when data falls outside the recommended range. Use `duration_range` to restrict which data points are used for fitting:
 
@@ -214,4 +243,5 @@ display = MinimalPowerDisplay.from_estimator(reg_minimal, durations.reshape(-1, 
 - Morton, R. H. (1996). A 3-parameter critical power model. *Ergonomics, 39*(4), 611-619.
 - Mulligan, M., Adam, G., & Emig, T. (2018). A minimal power model for human running performance. *PloS one, 13*(11), e0206645.
 - Puchowicz, M. J., Baker, J., & Clarke, D. C. (2020). Development and field validation of an omni-domain power-duration model. *Journal of Sports Sciences, 38*(7), 801-813.
+- Daniels, J., & Gilbert, J. (1979). *Oxygen Power: Performance Tables for Distance Runners.* Tempe, AZ.
 - Puchowicz, M. J., & Skiba, P. F. (2025). Functional Data Analysis of the Power-Duration Relationship in Cyclists. *International Journal of Sports Physiology and Performance, 1*(aop), 1-10.

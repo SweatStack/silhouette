@@ -360,6 +360,32 @@ const InfoModal = {
     }
 };
 
+const ExperimentalModal = {
+    show() {
+        $('experimental-modal').classList.add('visible');
+        document.body.style.overflow = 'hidden';
+    },
+
+    hide() {
+        $('experimental-modal').classList.remove('visible');
+        document.body.style.overflow = '';
+    },
+
+    init() {
+        $('experimental-modal').addEventListener('click', (e) => {
+            if (e.target === $('experimental-modal')) {
+                this.hide();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hide();
+            }
+        });
+    }
+};
+
 // ----------------------------------------------------------------------------
 // Python Bridge
 // ----------------------------------------------------------------------------
@@ -426,6 +452,7 @@ const App = {
         OutputPanel.init();
         CodeModal.init();
         InfoModal.init();
+        ExperimentalModal.init();
 
         // Call app-specific init if defined
         if (window.onInit) {
